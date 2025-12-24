@@ -65,6 +65,10 @@ Click **"Environment"** tab and add:
 - `VITE_RECAPTCHA_SITE_KEY` (optional)
 - `VERIFICATION_CODE` (default: 670069)
 - `NODE_ENV` = `production`
+- `SUPABASE_URL` = Your Supabase project URL (get from Supabase dashboard)
+- `SUPABASE_ANON_KEY` = Your Supabase anon key (get from Supabase dashboard)
+
+**See `SUPABASE_SETUP.md` for detailed Supabase setup instructions.**
 
 ### Step 6: Deploy!
 Click **"Create Web Service"**

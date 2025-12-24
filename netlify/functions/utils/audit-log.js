@@ -1,4 +1,5 @@
 const { getStore } = require('@netlify/blobs')
+const { supabase, isSupabaseAvailable } = require('./supabase-client')
 
 // Get client IP from event headers
 function getClientIP(event) {
@@ -17,11 +18,6 @@ function getUserAgent(event) {
 // Create audit log entry
 async function logAuditEvent(event, context, action, details) {
   try {
-    // Netlify Blobs automatically uses function context when available
-    const store = getStore({
-      name: 'audit-logs'
-    })
-
     const timestamp = new Date().toISOString()
     const ip = getClientIP(event)
     const userAgent = getUserAgent(event)
@@ -34,32 +30,82 @@ async function logAuditEvent(event, context, action, details) {
       ...details
     }
 
-    // Append to audit log (using timestamp as key for sorting)
-    const logKey = `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    await store.set(logKey, JSON.stringify(logEntry))
-
-    // Maintain complete logs list (never remove any logs)
-    const recentLogsKey = 'recent-logs'
-    let recentLogs = []
-    try {
-      const existing = await store.get(recentLogsKey)
-      if (existing) {
-        recentLogs = JSON.parse(existing)
+    // Try Supabase first (if available)
+    if (isSupabaseAvailable()) {
+      try {
+        const { error } = await supabase
+          .from('audit_logs')
+          .insert({
+            timestamp,
+            action,
+            ip_address: ip,
+            user_agent: userAgent,
+            details: JSON.stringify(details)
+          })
+        
+        if (!error) {
+          // Also maintain recent logs list in Supabase
+          await updateRecentLogs(logEntry)
+          return logEntry
+        }
+      } catch (error) {
+        console.warn('Supabase audit log failed, using fallback:', error.message)
       }
-    } catch (e) {
-      // First time, empty array
     }
+    
+    // Fallback to Netlify Blobs
+    try {
+      const store = getStore({
+        name: 'audit-logs'
+      })
 
-    // Add new log to beginning of array (most recent first)
-    recentLogs.unshift(logEntry)
-    // Never slice or remove - keep all logs permanently
-    await store.set(recentLogsKey, JSON.stringify(recentLogs))
+      // Append to audit log (using timestamp as key for sorting)
+      const logKey = `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      await store.set(logKey, JSON.stringify(logEntry))
 
-    return logEntry
+      // Also maintain a recent logs list (last 1000 entries)
+      const recentLogsKey = 'recent-logs'
+      let recentLogs = []
+      try {
+        const existing = await store.get(recentLogsKey)
+        if (existing) {
+          recentLogs = JSON.parse(existing)
+        }
+      } catch (e) {
+        // First time, empty array
+      }
+
+      recentLogs.unshift(logEntry)
+      // Keep all entries, no slicing
+      await store.set(recentLogsKey, JSON.stringify(recentLogs))
+
+      return logEntry
+    } catch (error) {
+      console.error('Error logging audit event:', error)
+      // Don't fail the request if logging fails
+      return null
+    }
   } catch (error) {
-    console.error('Error logging audit event:', error)
-    // Don't fail the request if logging fails
+    console.error('Error in logAuditEvent:', error)
     return null
+  }
+}
+
+// Update recent logs in Supabase
+async function updateRecentLogs(logEntry) {
+  if (!isSupabaseAvailable()) return
+  
+  try {
+    // Get current recent logs count
+    const { count } = await supabase
+      .from('audit_logs')
+      .select('*', { count: 'exact', head: true })
+    
+    // Insert new log (it will be most recent due to timestamp)
+    // No need to maintain a separate recent-logs table, we can query by timestamp
+    // The logEntry is already inserted in logAuditEvent
+  } catch (error) {
+    console.warn('Failed to update recent logs:', error.message)
   }
 }
 
@@ -130,9 +176,38 @@ async function logAutoClaim(event, context, codesClaimed, totalCodes, results) {
 }
 
 // Get audit logs
-async function getAuditLogs(context, limit = null) {
+async function getAuditLogs(context, limit = 100) {
+  // Try Supabase first
+  if (isSupabaseAvailable()) {
+    try {
+      let query = supabase
+        .from('audit_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+      
+      if (limit && limit > 0) {
+        query = query.limit(limit)
+      }
+      
+      const { data, error } = await query
+      
+      if (!error && data) {
+        // Convert Supabase format to our format
+        return data.map(row => ({
+          timestamp: row.timestamp,
+          action: row.action,
+          ip: row.ip_address,
+          userAgent: row.user_agent,
+          ...JSON.parse(row.details || '{}')
+        }))
+      }
+    } catch (error) {
+      console.warn('Supabase get audit logs failed, using fallback:', error.message)
+    }
+  }
+  
+  // Fallback to Netlify Blobs
   try {
-    // Netlify Blobs automatically uses function context when available
     const store = getStore({
       name: 'audit-logs'
     })
@@ -169,4 +244,3 @@ module.exports = {
   logAutoClaim,
   getAuditLogs
 }
-
