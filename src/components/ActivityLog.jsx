@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import ReCAPTCHA from 'react-google-recaptcha'
 import VerificationModal from './VerificationModal'
 import '../App.css'
-
-const API_BASE = '/.netlify/functions'
+import { API_BASE } from '../config'
 
 function ActivityLog({ activities, players, activePlayerId, showToast, onCodeClaimed }) {
   const [codes, setCodes] = useState([])

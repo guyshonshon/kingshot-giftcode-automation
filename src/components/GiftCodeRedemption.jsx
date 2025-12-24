@@ -1,8 +1,7 @@
 import React, { useState, useRef } from 'react'
 import ReCAPTCHA from 'react-google-recaptcha'
 import '../App.css'
-
-const API_BASE = '/.netlify/functions'
+import { API_BASE } from '../config'
 
 function GiftCodeRedemption({ players, onRedeemComplete, addActivity, showToast }) {
   const [giftCode, setGiftCode] = useState('')

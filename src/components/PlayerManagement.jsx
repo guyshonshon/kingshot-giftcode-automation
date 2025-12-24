@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import ReCAPTCHA from 'react-google-recaptcha'
 import '../App.css'
-
-const API_BASE = '/.netlify/functions'
+import { API_BASE } from '../config'
 
 function PlayerManagement({ players, activePlayerId, playerData = {}, onPlayerAdded, onPlayerRemoved, onDetachPlayer, addActivity, showToast, onCodeClaimed }) {
   const [playerId, setPlayerId] = useState('')

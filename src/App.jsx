@@ -8,8 +8,7 @@ import TermsOfService from './components/TermsOfService'
 import MessageBanner from './components/MessageBanner'
 import ToastContainer from './components/ToastContainer'
 import GiftIcon from './components/GiftIcon'
-
-const API_BASE = '/.netlify/functions'
+import { API_BASE } from './config'
 
 function App() {
   const [showTOS, setShowTOS] = useState(false)
