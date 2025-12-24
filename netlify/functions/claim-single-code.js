@@ -267,18 +267,34 @@ exports.handler = async (event, context) => {
     const json = JSON.parse(data)
     const playersData = json.players || []
     
-    const playerExists = playersData.some(p => 
-      typeof p === 'string' ? p === playerId : p.id === playerId
-    )
+    // Normalize playerId to string for comparison
+    const normalizedPlayerId = String(playerId).trim()
+    
+    const playerExists = playersData.some(p => {
+      if (typeof p === 'string') {
+        return String(p).trim() === normalizedPlayerId
+      } else if (p && p.id) {
+        return String(p.id).trim() === normalizedPlayerId
+      }
+      return false
+    })
     
     if (!playerExists) {
+      console.error(`Player ID not found. Looking for: ${normalizedPlayerId}, Available players:`, 
+        playersData.map(p => typeof p === 'string' ? p : p.id))
       return {
         statusCode: 403,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ error: 'Player ID not found' })
+        body: JSON.stringify({ 
+          error: 'Player ID not found',
+          debug: {
+            requestedId: normalizedPlayerId,
+            availablePlayers: playersData.map(p => typeof p === 'string' ? p : p.id)
+          }
+        })
       }
     }
 

@@ -68,10 +68,19 @@ function ActivityLog({ activities, players, activePlayerId, showToast, onCodeCla
       const response = await fetch(`${API_BASE}/claim-single-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId, giftCode, recaptchaToken })
+        body: JSON.stringify({ 
+          playerId: String(playerId).trim(), 
+          giftCode, 
+          recaptchaToken 
+        })
       })
 
       const data = await response.json()
+      
+      // Log debug info if available
+      if (data.debug) {
+        console.log('Claim debug info:', data.debug)
+      }
 
       if (data.success) {
         if (data.alreadyClaimed) {
