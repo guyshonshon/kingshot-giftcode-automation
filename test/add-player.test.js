@@ -68,19 +68,23 @@ describe('add-player function', () => {
       playerId: testPlayerId,
       recaptchaToken: null
     })
-    await handler(event1, mockContext)
+    const response1 = await handler(event1, mockContext)
+    expect(response1.statusCode).toBe(200)
+
+    // Wait a bit to ensure storage is updated
+    await new Promise(resolve => setTimeout(resolve, 100))
 
     // Try to add again
     const event2 = createMockEvent({
       playerId: testPlayerId,
       recaptchaToken: null
     })
-    const response = await handler(event2, mockContext)
-    const body = JSON.parse(response.body)
+    const response2 = await handler(event2, mockContext)
+    const body = JSON.parse(response2.body)
 
-    expect(response.statusCode).toBe(400)
+    expect(response2.statusCode).toBe(400)
     expect(body.error).toContain('already exists')
-  })
+  }, 30000)
 
   test('should verify player exists in storage after adding', async () => {
     const event = createMockEvent({

@@ -46,7 +46,8 @@ async function savePlayers(playersData, context) {
       name: error.name,
       stack: error.stack
     })
-    throw error // Re-throw to get better error messages
+    // Return false for backward compatibility, but log the error
+    return false
   }
 }
 
