@@ -1,10 +1,9 @@
 // Express server - SIMPLE deployment
-// Handles all API routes, serves static files, and runs background tasks
+// Handles all API routes and serves static files
 
 const express = require('express')
 const path = require('path')
 const cors = require('cors')
-const cron = require('node-cron')
 
 // Initialize database
 require('./db')
@@ -148,24 +147,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'))
 })
 
-// Background task: Check for expired codes every hour
-cron.schedule('0 * * * *', async () => {
-  console.log('Running scheduled task: check-expired-codes')
-  try {
-    const checkExpiredCodes = require('./netlify/functions/check-expired-codes')
-    const mockEvent = {
-      httpMethod: 'POST',
-      headers: { 'x-netlify-trigger': 'scheduled' },
-      body: JSON.stringify({})
-    }
-    await checkExpiredCodes.handler(mockEvent, {})
-  } catch (error) {
-    console.error('Error in scheduled task:', error)
-  }
-})
-
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
-  console.log('Background tasks enabled (check-expired-codes runs hourly)')
 })
 
