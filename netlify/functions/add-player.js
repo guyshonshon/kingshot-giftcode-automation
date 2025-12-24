@@ -191,7 +191,13 @@ exports.handler = async (event, context) => {
       verificationData: verificationResult.data || null
     }
     
-    const result = await addPlayer(playerData, context)
+    let result
+    try {
+      result = await addPlayer(playerData, context)
+    } catch (error) {
+      console.error('Error in addPlayer:', error)
+      throw new Error(`Failed to save player: ${error.message}`)
+    }
     
     if (!result.success) {
       if (result.error === 'Player already exists') {
@@ -229,13 +235,18 @@ exports.handler = async (event, context) => {
     }
   } catch (error) {
     console.error('Error adding player:', error)
+    console.error('Error stack:', error.stack)
     return {
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({ error: 'Failed to add player' })
+      body: JSON.stringify({ 
+        error: 'Failed to add player',
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      })
     }
   }
 }

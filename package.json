@@ -5,7 +5,9 @@
     "dev": "vite",
     "dev:netlify": "netlify dev",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@netlify/blobs": "^4.0.0",
@@ -15,9 +17,11 @@
     "react-google-recaptcha": "^3.1.0"
   },
   "devDependencies": {
+    "@netlify/functions": "^5.1.2",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",
+    "jest": "^30.2.0",
     "vite": "^7.3.0"
   }
 }

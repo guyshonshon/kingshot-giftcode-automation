@@ -19,6 +19,12 @@ async function getPlayers(context) {
     return JSON.parse(data)
   } catch (error) {
     console.error('Error getting players from Blobs:', error)
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    })
+    // Return empty array but log the error
     return { players: [] }
   }
 }
@@ -35,7 +41,12 @@ async function savePlayers(playersData, context) {
     return true
   } catch (error) {
     console.error('Error saving players to Blobs:', error)
-    return false
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    })
+    throw error // Re-throw to get better error messages
   }
 }
 
