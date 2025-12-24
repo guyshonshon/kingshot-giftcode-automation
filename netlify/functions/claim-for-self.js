@@ -333,7 +333,6 @@ exports.handler = async (event, context) => {
     }
 
     // Verify player exists using Netlify Blobs
-    const { playerExists, getPlayers, updatePlayer } = require('./utils/player-storage')
     const normalizedPlayerId = String(playerId).trim()
     const exists = await playerExists(normalizedPlayerId)
     
