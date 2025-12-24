@@ -1,8 +1,8 @@
 const fs = require('fs').promises
 const path = require('path')
 const https = require('https')
-const { logAutoClaim } = require('./utils/audit-log')
-const { getPlayers, updatePlayer } = require('./utils/player-storage')
+const { logAutoClaim } = require('./utils/simple-audit')
+const { getPlayers, updatePlayer } = require('./utils/simple-storage')
 
 const CLAIMS_FILE = path.join('/tmp', 'claims.json')
 const VERIFICATION_CODE = process.env.VERIFICATION_CODE || '670069'
@@ -241,8 +241,8 @@ exports.handler = async (event, context) => {
   try {
     const { force = false } = event.body ? JSON.parse(event.body) : {}
     
-    // Get players using player-storage utility (supports both Blobs and file storage)
-    const playersData = await getPlayers(context)
+    // Get players
+    const playersData = await getPlayers()
     const playersList = playersData.players || []
     
     // Support both old format (array of strings) and new format (array of objects)
@@ -318,9 +318,9 @@ exports.handler = async (event, context) => {
             codeSuccessCount++
             await markAsClaimed(playerId, giftCode)
             
-            // Update player metadata using player-storage utility
+            // Update player metadata
             const normalizedPlayerId = String(playerId).trim()
-            const currentData = await getPlayers(context)
+            const currentData = await getPlayers()
             const currentPlayer = currentData.players.find(p => {
               const pId = typeof p === 'string' ? p : p.id
               return String(pId).trim() === normalizedPlayerId
@@ -333,7 +333,7 @@ exports.handler = async (event, context) => {
             await updatePlayer(normalizedPlayerId, {
               lastClaimed: new Date().toISOString(),
               totalClaims: currentTotalClaims + 1
-            }, context)
+            })
             
             results.push({ playerId, giftCode, success: true })
           } else {

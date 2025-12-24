@@ -1,8 +1,8 @@
 const fs = require('fs').promises
 const path = require('path')
 const https = require('https')
-const { logAutoClaim } = require('./utils/audit-log')
-const { playerExists, getPlayers, updatePlayer } = require('./utils/player-storage')
+const { logAutoClaim } = require('./utils/simple-audit')
+const { playerExists, getPlayers, updatePlayer } = require('./utils/simple-storage')
 
 const DATA_FILE = path.join('/tmp', 'players.json')
 const CLAIMS_FILE = path.join('/tmp', 'claims.json')
@@ -333,9 +333,9 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Verify player exists using Netlify Blobs
+    // Verify player exists
     const normalizedPlayerId = String(playerId).trim()
-    const exists = await playerExists(normalizedPlayerId, context)
+    const exists = await playerExists(normalizedPlayerId)
     
     if (!exists) {
       return {
@@ -421,8 +421,8 @@ exports.handler = async (event, context) => {
           await markAsClaimed(playerId, giftCode)
           await addRecentCode(giftCode, playerId)
           
-          // Update player metadata using Netlify Blobs
-          const currentData = await getPlayers(context)
+          // Update player metadata
+          const currentData = await getPlayers()
           const currentPlayer = currentData.players.find(p => {
             const pId = typeof p === 'string' ? p : p.id
             return String(pId).trim() === normalizedPlayerId
@@ -435,7 +435,7 @@ exports.handler = async (event, context) => {
           await updatePlayer(normalizedPlayerId, {
             lastClaimed: new Date().toISOString(),
             totalClaims: currentTotalClaims + 1
-          }, context)
+          })
           
           codesClaimed.push(giftCode)
           results.push({ giftCode, success: true })

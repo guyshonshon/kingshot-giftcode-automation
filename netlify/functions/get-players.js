@@ -1,4 +1,4 @@
-const { getPlayers } = require('./utils/player-storage')
+const { getPlayers } = require('./utils/simple-storage')
 
 exports.handler = async (event, context) => {
   if (event.httpMethod !== 'GET') {
@@ -13,7 +13,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const data = await getPlayers(context)
+    const data = await getPlayers()
     
     // Support both old format (array of strings) and new format (array of objects)
     const players = (data.players || []).map(p => 

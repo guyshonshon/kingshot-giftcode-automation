@@ -1,9 +1,13 @@
-// Express server for Render deployment
-// Handles all API routes and serves static files
+// Express server - SIMPLE deployment
+// Handles all API routes, serves static files, and runs background tasks
 
 const express = require('express')
 const path = require('path')
 const cors = require('cors')
+const cron = require('node-cron')
+
+// Initialize database
+require('./db')
 
 const app = express()
 const PORT = process.env.PORT || 3000

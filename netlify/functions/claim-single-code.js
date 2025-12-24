@@ -1,8 +1,8 @@
 const fs = require('fs').promises
 const path = require('path')
 const https = require('https')
-const { logSingleCodeClaim } = require('./utils/audit-log')
-const { getPlayers, playerExists, updatePlayer } = require('./utils/player-storage')
+const { logSingleCodeClaim } = require('./utils/simple-audit')
+const { getPlayers, playerExists, updatePlayer } = require('./utils/simple-storage')
 
 const CLAIMS_FILE = path.join('/tmp', 'claims.json')
 const RECENT_CODES_FILE = path.join('/tmp', 'recent-codes.json')
@@ -271,12 +271,12 @@ exports.handler = async (event, context) => {
 
     // No verification code required for single player claims
 
-    // Verify player exists using Netlify Blobs
+    // Verify player exists
     const normalizedPlayerId = String(playerId).trim()
-    const exists = await playerExists(normalizedPlayerId, context)
+    const exists = await playerExists(normalizedPlayerId)
     
     if (!exists) {
-      const allPlayers = await getPlayers(context)
+      const allPlayers = await getPlayers()
       console.error(`Player ID not found. Looking for: ${normalizedPlayerId}, Available players:`, 
         (allPlayers.players || []).map(p => typeof p === 'string' ? p : p.id))
       return {
@@ -375,8 +375,8 @@ exports.handler = async (event, context) => {
       await markAsClaimed(playerId, giftCode)
       await addRecentCode(giftCode, playerId)
       
-      // Update player metadata using Netlify Blobs
-      const currentData = await getPlayers(context)
+      // Update player metadata
+      const currentData = await getPlayers()
       const currentPlayer = currentData.players.find(p => {
         const pId = typeof p === 'string' ? p : p.id
         return String(pId).trim() === normalizedPlayerId
@@ -389,7 +389,7 @@ exports.handler = async (event, context) => {
       await updatePlayer(normalizedPlayerId, {
         lastClaimed: new Date().toISOString(),
         totalClaims: currentTotalClaims + 1
-      }, context)
+      })
       
       // Log audit event
       await logSingleCodeClaim(event, context, playerId, giftCode, true)

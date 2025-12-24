@@ -1,6 +1,6 @@
 const https = require('https')
 const http = require('http')
-const { logCodeRedemption } = require('./utils/audit-log')
+const { logCodeRedemption } = require('./utils/simple-audit')
 
 // Rate limiting: track requests per gift code
 // Note: In serverless, this is per-instance, but provides basic protection

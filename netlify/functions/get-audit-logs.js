@@ -1,4 +1,4 @@
-const { getAuditLogs } = require('./utils/audit-log')
+const { getAuditLogs } = require('./utils/simple-audit')
 
 exports.handler = async (event, context) => {
   if (event.httpMethod !== 'GET') {
@@ -14,7 +14,7 @@ exports.handler = async (event, context) => {
 
   try {
     const limit = parseInt(event.queryStringParameters?.limit || '100', 10)
-    const logs = await getAuditLogs(context, limit)
+    const logs = await getAuditLogs(null, limit)
     
     return {
       statusCode: 200,

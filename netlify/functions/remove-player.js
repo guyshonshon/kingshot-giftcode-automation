@@ -1,6 +1,6 @@
 const https = require('https')
-const { logPlayerRemoved } = require('./utils/audit-log')
-const { removePlayer } = require('./utils/player-storage')
+const { logPlayerRemoved } = require('./utils/simple-audit')
+const { removePlayer } = require('./utils/simple-storage')
 
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY
 
@@ -99,8 +99,8 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Remove player using Netlify Blobs
-    const result = await removePlayer(playerId, context)
+    // Remove player
+    const result = await removePlayer(playerId)
     
     if (!result.success) {
       await logPlayerRemoved(event, context, playerId, false)

@@ -1,6 +1,6 @@
 const https = require('https')
-const { logPlayerAdded } = require('./utils/audit-log')
-const { getPlayers, addPlayer } = require('./utils/player-storage')
+const { logPlayerAdded } = require('./utils/simple-audit')
+const { getPlayers, addPlayer } = require('./utils/simple-storage')
 
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY
 
@@ -193,7 +193,7 @@ exports.handler = async (event, context) => {
     
     let result
     try {
-      result = await addPlayer(playerData, context)
+      result = await addPlayer(playerData)
     } catch (error) {
       console.error('Error in addPlayer:', error)
       console.error('Error stack:', error.stack)

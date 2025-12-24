@@ -1,6 +1,6 @@
 const fs = require('fs').promises
 const path = require('path')
-const { getPlayers } = require('./utils/player-storage')
+const { getPlayers } = require('./utils/simple-storage')
 
 const CLAIMS_FILE = path.join('/tmp', 'claims.json')
 
@@ -39,7 +39,7 @@ exports.handler = async (event, context) => {
 
     const playerIds = playersParam.split(',').filter(id => id.trim())
     
-    const data = await getPlayers(context)
+    const data = await getPlayers()
     const playersData = data.players || []
     
     await ensureClaimsFile()
