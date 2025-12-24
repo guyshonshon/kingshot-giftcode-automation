@@ -2,18 +2,10 @@ const fs = require('fs').promises
 const path = require('path')
 const https = require('https')
 const { logAutoClaim } = require('./utils/audit-log')
+const { getPlayers, updatePlayer } = require('./utils/player-storage')
 
-const DATA_FILE = path.join('/tmp', 'players.json')
 const CLAIMS_FILE = path.join('/tmp', 'claims.json')
 const VERIFICATION_CODE = process.env.VERIFICATION_CODE || '670069'
-
-async function ensureDataFile() {
-  try {
-    await fs.access(DATA_FILE)
-  } catch {
-    await fs.writeFile(DATA_FILE, JSON.stringify({ players: [] }), 'utf8')
-  }
-}
 
 async function ensureClaimsFile() {
   try {
@@ -249,13 +241,12 @@ exports.handler = async (event, context) => {
   try {
     const { force = false } = event.body ? JSON.parse(event.body) : {}
     
-    await ensureDataFile()
-    const data = await fs.readFile(DATA_FILE, 'utf8')
-    const json = JSON.parse(data)
-    const playersData = json.players || []
+    // Get players using player-storage utility (supports both Blobs and file storage)
+    const playersData = await getPlayers(context)
+    const playersList = playersData.players || []
     
     // Support both old format (array of strings) and new format (array of objects)
-    const players = playersData.map(p => typeof p === 'string' ? p : p.id)
+    const players = playersList.map(p => typeof p === 'string' ? p : p.id)
 
     if (players.length === 0) {
       return {
@@ -327,25 +318,22 @@ exports.handler = async (event, context) => {
             codeSuccessCount++
             await markAsClaimed(playerId, giftCode)
             
-            // Update player metadata
-            const playerIndex = playersData.findIndex(p => 
-              typeof p === 'string' ? p === playerId : p.id === playerId
-            )
-            if (playerIndex >= 0) {
-              if (typeof playersData[playerIndex] === 'string') {
-                playersData[playerIndex] = {
-                  id: playerId,
-                  addedAt: new Date().toISOString(),
-                  lastClaimed: new Date().toISOString(),
-                  totalClaims: 1
-                }
-              } else {
-                playersData[playerIndex].lastClaimed = new Date().toISOString()
-                playersData[playerIndex].totalClaims = (playersData[playerIndex].totalClaims || 0) + 1
-              }
-              json.players = playersData
-              await fs.writeFile(DATA_FILE, JSON.stringify(json), 'utf8')
-            }
+            // Update player metadata using player-storage utility
+            const normalizedPlayerId = String(playerId).trim()
+            const currentData = await getPlayers(context)
+            const currentPlayer = currentData.players.find(p => {
+              const pId = typeof p === 'string' ? p : p.id
+              return String(pId).trim() === normalizedPlayerId
+            })
+            
+            const currentTotalClaims = (currentPlayer && typeof currentPlayer === 'object') 
+              ? (currentPlayer.totalClaims || 0) 
+              : 0
+            
+            await updatePlayer(normalizedPlayerId, {
+              lastClaimed: new Date().toISOString(),
+              totalClaims: currentTotalClaims + 1
+            }, context)
             
             results.push({ playerId, giftCode, success: true })
           } else {

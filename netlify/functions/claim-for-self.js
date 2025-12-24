@@ -2,6 +2,7 @@ const fs = require('fs').promises
 const path = require('path')
 const https = require('https')
 const { logAutoClaim } = require('./utils/audit-log')
+const { playerExists, getPlayers, updatePlayer } = require('./utils/player-storage')
 
 const DATA_FILE = path.join('/tmp', 'players.json')
 const CLAIMS_FILE = path.join('/tmp', 'claims.json')

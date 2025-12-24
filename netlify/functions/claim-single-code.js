@@ -260,7 +260,7 @@ exports.handler = async (event, context) => {
     const exists = await playerExists(normalizedPlayerId, context)
     
     if (!exists) {
-      const allPlayers = await getPlayers()
+      const allPlayers = await getPlayers(context)
       console.error(`Player ID not found. Looking for: ${normalizedPlayerId}, Available players:`, 
         (allPlayers.players || []).map(p => typeof p === 'string' ? p : p.id))
       return {
