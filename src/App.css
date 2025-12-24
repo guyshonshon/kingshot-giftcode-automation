@@ -372,8 +372,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
-  max-height: 400px;
-  overflow-y: auto;
 }
 
 .player-item {

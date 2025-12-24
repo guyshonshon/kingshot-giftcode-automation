@@ -1,9 +1,7 @@
-const fs = require('fs').promises
-const path = require('path')
 const https = require('https')
 const { logPlayerRemoved } = require('./utils/audit-log')
+const { removePlayer } = require('./utils/player-storage')
 
-const DATA_FILE = path.join('/tmp', 'players.json')
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY
 
 async function verifyRecaptcha(token) {
@@ -47,13 +45,7 @@ async function verifyRecaptcha(token) {
   })
 }
 
-async function ensureDataFile() {
-  try {
-    await fs.access(DATA_FILE)
-  } catch {
-    await fs.writeFile(DATA_FILE, JSON.stringify({ players: [] }), 'utf8')
-  }
-}
+// Removed ensureDataFile - using Netlify Blobs now
 
 exports.handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
@@ -107,30 +99,23 @@ exports.handler = async (event, context) => {
       }
     }
 
-    await ensureDataFile()
-    const data = await fs.readFile(DATA_FILE, 'utf8')
-    const json = JSON.parse(data)
+    // Remove player using Netlify Blobs
+    const result = await removePlayer(playerId)
     
-    if (!json.players) {
-      json.players = []
+    if (!result.success) {
+      await logPlayerRemoved(event, context, playerId, false)
+      return {
+        statusCode: 404,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ error: result.error || 'Player not found' })
+      }
     }
 
-    // Support both old format (array of strings) and new format (array of objects)
-    const playerExisted = json.players.some(p => 
-      typeof p === 'string' ? p === playerId : p.id === playerId
-    )
-
-    json.players = json.players.filter(p => {
-      if (typeof p === 'string') {
-        return p !== playerId
-      }
-      return p.id !== playerId
-    })
-    
-    await fs.writeFile(DATA_FILE, JSON.stringify(json), 'utf8')
-
     // Log audit event
-    await logPlayerRemoved(event, context, playerId, playerExisted)
+    await logPlayerRemoved(event, context, playerId, true)
 
     return {
       statusCode: 200,

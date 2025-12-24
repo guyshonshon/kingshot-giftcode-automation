@@ -2,8 +2,8 @@ const fs = require('fs').promises
 const path = require('path')
 const https = require('https')
 const { logSingleCodeClaim } = require('./utils/audit-log')
+const { getPlayers, playerExists, updatePlayer } = require('./utils/player-storage')
 
-const DATA_FILE = path.join('/tmp', 'players.json')
 const CLAIMS_FILE = path.join('/tmp', 'claims.json')
 const RECENT_CODES_FILE = path.join('/tmp', 'recent-codes.json')
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY
@@ -49,13 +49,7 @@ async function verifyRecaptcha(token) {
   })
 }
 
-async function ensureDataFile() {
-  try {
-    await fs.access(DATA_FILE)
-  } catch {
-    await fs.writeFile(DATA_FILE, JSON.stringify({ players: [] }), 'utf8')
-  }
-}
+// Removed ensureDataFile - using Netlify Blobs now
 
 async function ensureClaimsFile() {
   try {
@@ -261,27 +255,14 @@ exports.handler = async (event, context) => {
 
     // No verification code required for single player claims
 
-    // Verify player exists
-    await ensureDataFile()
-    const data = await fs.readFile(DATA_FILE, 'utf8')
-    const json = JSON.parse(data)
-    const playersData = json.players || []
-    
-    // Normalize playerId to string for comparison
+    // Verify player exists using Netlify Blobs
     const normalizedPlayerId = String(playerId).trim()
+    const exists = await playerExists(normalizedPlayerId)
     
-    const playerExists = playersData.some(p => {
-      if (typeof p === 'string') {
-        return String(p).trim() === normalizedPlayerId
-      } else if (p && p.id) {
-        return String(p.id).trim() === normalizedPlayerId
-      }
-      return false
-    })
-    
-    if (!playerExists) {
+    if (!exists) {
+      const allPlayers = await getPlayers()
       console.error(`Player ID not found. Looking for: ${normalizedPlayerId}, Available players:`, 
-        playersData.map(p => typeof p === 'string' ? p : p.id))
+        (allPlayers.players || []).map(p => typeof p === 'string' ? p : p.id))
       return {
         statusCode: 403,
         headers: {
@@ -292,7 +273,7 @@ exports.handler = async (event, context) => {
           error: 'Player ID not found',
           debug: {
             requestedId: normalizedPlayerId,
-            availablePlayers: playersData.map(p => typeof p === 'string' ? p : p.id)
+            availablePlayers: (allPlayers.players || []).map(p => typeof p === 'string' ? p : p.id)
           }
         })
       }
@@ -364,25 +345,21 @@ exports.handler = async (event, context) => {
       await markAsClaimed(playerId, giftCode)
       await addRecentCode(giftCode, playerId)
       
-      // Update player metadata
-      const playerIndex = playersData.findIndex(p => 
-        typeof p === 'string' ? p === playerId : p.id === playerId
-      )
-      if (playerIndex >= 0) {
-        if (typeof playersData[playerIndex] === 'string') {
-          playersData[playerIndex] = {
-            id: playerId,
-            addedAt: new Date().toISOString(),
-            lastClaimed: new Date().toISOString(),
-            totalClaims: 1
-          }
-        } else {
-          playersData[playerIndex].lastClaimed = new Date().toISOString()
-          playersData[playerIndex].totalClaims = (playersData[playerIndex].totalClaims || 0) + 1
-        }
-        json.players = playersData
-        await fs.writeFile(DATA_FILE, JSON.stringify(json), 'utf8')
-      }
+      // Update player metadata using Netlify Blobs
+      const currentData = await getPlayers()
+      const currentPlayer = currentData.players.find(p => {
+        const pId = typeof p === 'string' ? p : p.id
+        return String(pId).trim() === normalizedPlayerId
+      })
+      
+      const currentTotalClaims = (currentPlayer && typeof currentPlayer === 'object') 
+        ? (currentPlayer.totalClaims || 0) 
+        : 0
+      
+      await updatePlayer(normalizedPlayerId, {
+        lastClaimed: new Date().toISOString(),
+        totalClaims: currentTotalClaims + 1
+      })
       
       // Log audit event
       await logSingleCodeClaim(event, context, playerId, giftCode, true)

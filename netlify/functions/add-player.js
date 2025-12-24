@@ -1,9 +1,7 @@
-const fs = require('fs').promises
-const path = require('path')
 const https = require('https')
 const { logPlayerAdded } = require('./utils/audit-log')
+const { getPlayers, addPlayer } = require('./utils/player-storage')
 
-const DATA_FILE = path.join('/tmp', 'players.json')
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY
 
 async function verifyRecaptcha(token) {
@@ -47,13 +45,7 @@ async function verifyRecaptcha(token) {
   })
 }
 
-async function ensureDataFile() {
-  try {
-    await fs.access(DATA_FILE)
-  } catch {
-    await fs.writeFile(DATA_FILE, JSON.stringify({ players: [] }), 'utf8')
-  }
-}
+// Removed ensureDataFile - using Netlify Blobs now
 
 // Verify player ID by checking Kingshot API
 async function verifyPlayer(playerId) {
@@ -165,31 +157,6 @@ exports.handler = async (event, context) => {
       }
     }
 
-    await ensureDataFile()
-    const data = await fs.readFile(DATA_FILE, 'utf8')
-    const json = JSON.parse(data)
-    
-    if (!json.players) {
-      json.players = []
-    }
-    
-    // Check if player already exists (support both old array format and new object format)
-    const existingPlayer = json.players.find(p => 
-      typeof p === 'string' ? p === playerId : p.id === playerId
-    )
-    
-    if (existingPlayer) {
-      await logPlayerAdded(event, context, playerId, false)
-      return {
-        statusCode: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({ error: 'Player ID already exists' })
-      }
-    }
-
     // Verify player with Kingshot API
     let verificationResult
     try {
@@ -214,17 +181,32 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Add player with metadata and verification info
-    json.players.push({
+    // Add player with metadata and verification info using Netlify Blobs
+    const playerData = {
       id: playerId,
       addedAt: new Date().toISOString(),
       lastClaimed: null,
       totalClaims: 0,
       verified: true,
       verificationData: verificationResult.data || null
-    })
+    }
     
-    await fs.writeFile(DATA_FILE, JSON.stringify(json), 'utf8')
+    const result = await addPlayer(playerData)
+    
+    if (!result.success) {
+      if (result.error === 'Player already exists') {
+        await logPlayerAdded(event, context, playerId, false)
+        return {
+          statusCode: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          },
+          body: JSON.stringify({ error: 'Player ID already exists' })
+        }
+      }
+      throw new Error(result.error || 'Failed to save player')
+    }
 
     // Log audit event
     await logPlayerAdded(event, context, playerId, true)
