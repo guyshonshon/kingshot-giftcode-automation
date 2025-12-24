@@ -232,9 +232,18 @@ function App() {
             <div className="active-player-info">
               <span className="active-player-label">Logged in as:</span>
               <span className="active-player-name">
-                {playerData[activePlayerId]?.verificationData?.player_name || 
-                 playerData[activePlayerId]?.verificationData?.name || 
-                 activePlayerId}
+                {(playerData[activePlayerId]?.verificationData?.player_name || 
+                  playerData[activePlayerId]?.verificationData?.name) ? (
+                  <>
+                    {playerData[activePlayerId]?.verificationData?.player_name || 
+                     playerData[activePlayerId]?.verificationData?.name}
+                    <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', opacity: 0.7 }}>
+                      ({activePlayerId})
+                    </span>
+                  </>
+                ) : (
+                  activePlayerId
+                )}
               </span>
             </div>
           )}

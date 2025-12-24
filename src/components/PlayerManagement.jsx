@@ -240,18 +240,36 @@ function PlayerManagement({ players, activePlayerId, playerData = {}, onPlayerAd
               return (
                 <div key={id} className="player-item">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
-                    <span className="player-id">
-                      {id}
-                      {player.verified && (
-                        <span style={{ marginLeft: '0.5rem', color: 'var(--success)', fontSize: '0.9em' }}>
-                          ✓ Verified
+                    {player.verificationData && (player.verificationData.player_name || player.verificationData.name) ? (
+                      <>
+                        <span className="player-id" style={{ fontWeight: 600, fontSize: '1.05rem' }}>
+                          {player.verificationData.player_name || player.verificationData.name}
+                          {player.verified && (
+                            <span style={{ marginLeft: '0.5rem', color: 'var(--success)', fontSize: '0.85em' }}>
+                              ✓ Verified
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </span>
-                    {player.verificationData && (
-                      <div style={{ fontSize: '0.75em', color: 'var(--text-secondary)' }}>
-                        {player.verificationData.player_name || player.verificationData.name || 'Player verified'}
-                      </div>
+                        <div style={{ fontSize: '0.8em', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                          ID: {id}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="player-id">
+                          {id}
+                          {player.verified && (
+                            <span style={{ marginLeft: '0.5rem', color: 'var(--success)', fontSize: '0.9em' }}>
+                              ✓ Verified
+                            </span>
+                          )}
+                        </span>
+                        {player.verificationData && (
+                          <div style={{ fontSize: '0.75em', color: 'var(--text-secondary)' }}>
+                            Player verified
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
