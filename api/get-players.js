@@ -51,5 +51,5 @@ exports.handler = handler
 
 // Vercel format
 const { createVercelHandler } = require('./_vercel-wrapper')
-module.exports = createVercelHandler(handler)}
+module.exports = createVercelHandler(handler)
 
