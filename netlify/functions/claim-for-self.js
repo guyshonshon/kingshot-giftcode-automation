@@ -49,13 +49,7 @@ async function verifyRecaptcha(token) {
   })
 }
 
-async function ensureDataFile() {
-  try {
-    await fs.access(DATA_FILE)
-  } catch {
-    await fs.writeFile(DATA_FILE, JSON.stringify({ players: [] }), 'utf8')
-  }
-}
+// Removed ensureDataFile - using Netlify Blobs now
 
 async function ensureClaimsFile() {
   try {
@@ -338,18 +332,12 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Verify player exists and update metadata
-    await ensureDataFile()
-    const data = await fs.readFile(DATA_FILE, 'utf8')
-    const json = JSON.parse(data)
-    const players = json.players || []
+    // Verify player exists using Netlify Blobs
+    const { playerExists, getPlayers, updatePlayer } = require('./utils/player-storage')
+    const normalizedPlayerId = String(playerId).trim()
+    const exists = await playerExists(normalizedPlayerId)
     
-    // Support both old format (array of strings) and new format (array of objects)
-    const playerExists = players.some(p => 
-      typeof p === 'string' ? p === playerId : p.id === playerId
-    )
-    
-    if (!playerExists) {
+    if (!exists) {
       return {
         statusCode: 403,
         headers: {
@@ -433,24 +421,21 @@ exports.handler = async (event, context) => {
           await markAsClaimed(playerId, giftCode)
           await addRecentCode(giftCode, playerId)
           
-          // Update player metadata
-          const playerIndex = json.players.findIndex(p => 
-            typeof p === 'string' ? p === playerId : p.id === playerId
-          )
-          if (playerIndex >= 0) {
-            if (typeof json.players[playerIndex] === 'string') {
-              json.players[playerIndex] = {
-                id: playerId,
-                addedAt: new Date().toISOString(),
-                lastClaimed: new Date().toISOString(),
-                totalClaims: 1
-              }
-            } else {
-              json.players[playerIndex].lastClaimed = new Date().toISOString()
-              json.players[playerIndex].totalClaims = (json.players[playerIndex].totalClaims || 0) + 1
-            }
-            await fs.writeFile(DATA_FILE, JSON.stringify(json), 'utf8')
-          }
+          // Update player metadata using Netlify Blobs
+          const currentData = await getPlayers()
+          const currentPlayer = currentData.players.find(p => {
+            const pId = typeof p === 'string' ? p : p.id
+            return String(pId).trim() === normalizedPlayerId
+          })
+          
+          const currentTotalClaims = (currentPlayer && typeof currentPlayer === 'object') 
+            ? (currentPlayer.totalClaims || 0) 
+            : 0
+          
+          await updatePlayer(normalizedPlayerId, {
+            lastClaimed: new Date().toISOString(),
+            totalClaims: currentTotalClaims + 1
+          })
           
           codesClaimed.push(giftCode)
           results.push({ giftCode, success: true })

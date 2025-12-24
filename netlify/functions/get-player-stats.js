@@ -1,16 +1,8 @@
 const fs = require('fs').promises
 const path = require('path')
+const { getPlayers } = require('./utils/player-storage')
 
-const DATA_FILE = path.join('/tmp', 'players.json')
 const CLAIMS_FILE = path.join('/tmp', 'claims.json')
-
-async function ensureDataFile() {
-  try {
-    await fs.access(DATA_FILE)
-  } catch {
-    await fs.writeFile(DATA_FILE, JSON.stringify({ players: [] }), 'utf8')
-  }
-}
 
 async function ensureClaimsFile() {
   try {
@@ -47,10 +39,8 @@ exports.handler = async (event, context) => {
 
     const playerIds = playersParam.split(',').filter(id => id.trim())
     
-    await ensureDataFile()
-    const data = await fs.readFile(DATA_FILE, 'utf8')
-    const json = JSON.parse(data)
-    const playersData = json.players || []
+    const data = await getPlayers()
+    const playersData = data.players || []
     
     await ensureClaimsFile()
     const claimsData = await fs.readFile(CLAIMS_FILE, 'utf8')
