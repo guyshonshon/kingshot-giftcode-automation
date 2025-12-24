@@ -246,7 +246,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { playerId, giftCode, recaptchaToken, verificationCode } = JSON.parse(event.body)
+    const { playerId, giftCode, recaptchaToken } = JSON.parse(event.body)
 
     if (!playerId || !giftCode) {
       return {
@@ -259,17 +259,7 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Verify 6-digit code
-    if (!verificationCode || verificationCode !== VERIFICATION_CODE) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({ error: 'Invalid verification code' })
-      }
-    }
+    // No verification code required for single player claims
 
     // Verify player exists
     await ensureDataFile()

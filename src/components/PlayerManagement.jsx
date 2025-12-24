@@ -8,36 +8,13 @@ function PlayerManagement({ players, activePlayerId, onPlayerAdded, onPlayerRemo
   const [playerId, setPlayerId] = useState('')
   const [loading, setLoading] = useState(false)
   const [claimingPlayerId, setClaimingPlayerId] = useState(null)
-  const [playerData, setPlayerData] = useState({}) // Store player verification data
+  const [localPlayerData, setLocalPlayerData] = useState({}) // Local player data cache
   const addRecaptchaRef = useRef(null)
   const removeRecaptchaRefs = useRef({})
   const claimRecaptchaRefs = useRef({})
   
-  // Load player data on mount
-  useEffect(() => {
-    loadPlayerData()
-  }, [players])
-  
-  const loadPlayerData = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/get-players`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch')
-      }
-      const data = await response.json()
-      if (data.playersData) {
-        const dataMap = {}
-        data.playersData.forEach(p => {
-          const id = typeof p === 'string' ? p : p.id
-          dataMap[id] = typeof p === 'object' ? p : { id: p, verified: false }
-        })
-        setPlayerData(dataMap)
-      }
-    } catch (error) {
-      // Silently fail - functions may not be available in dev
-      console.error('Error loading player data:', error)
-    }
-  }
+  // Merge prop playerData with local playerData
+  const mergedPlayerData = { ...localPlayerData, ...playerData }
 
   const handleAddPlayer = async (e) => {
     e.preventDefault()
@@ -92,19 +69,23 @@ function PlayerManagement({ players, activePlayerId, onPlayerAdded, onPlayerRemo
       if (data.success) {
         setPlayerId('')
         addRecaptchaRef.current?.reset()
-        onPlayerAdded(trimmedId)
+        
+        const playerInfo = {
+          id: trimmedId,
+          verified: data.verified || false,
+          verificationData: data.verificationData || null
+        }
+        
+        // Update local player data
+        setLocalPlayerData(prev => ({
+          ...prev,
+          [trimmedId]: playerInfo
+        }))
+        
+        // Pass player info to parent
+        onPlayerAdded(trimmedId, playerInfo)
         
         if (data.verified) {
-          // Update player data with verification info
-          setPlayerData(prev => ({
-            ...prev,
-            [trimmedId]: {
-              id: trimmedId,
-              verified: true,
-              verificationData: data.verificationData
-            }
-          }))
-          
           showToast(`Player ${trimmedId} verified and added successfully`, 'success')
         } else {
           showToast(`Added player: ${trimmedId}`, 'success')
@@ -255,7 +236,7 @@ function PlayerManagement({ players, activePlayerId, onPlayerAdded, onPlayerRemo
           </h3>
           <div className="player-list">
             {players.map((id) => {
-              const player = playerData[id] || { id, verified: false }
+              const player = mergedPlayerData[id] || { id, verified: false, verificationData: null }
               return (
                 <div key={id} className="player-item">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>

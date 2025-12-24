@@ -24,6 +24,7 @@ function App() {
     failedRedeems: 0
   })
   const [playerStats, setPlayerStats] = useState({}) // Individual player stats
+  const [playerData, setPlayerData] = useState({}) // Player verification data (name, etc.)
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
   const [toasts, setToasts] = useState([])
@@ -60,9 +61,14 @@ function App() {
         localStorage.removeItem('activePlayerId')
       }
       
-      // Load player data for PlayerManagement component
+      // Store player data (including names) for display
       if (data.playersData) {
-        // This will be handled by PlayerManagement component
+        const dataMap = {}
+        data.playersData.forEach(p => {
+          const id = typeof p === 'string' ? p : p.id
+          dataMap[id] = typeof p === 'object' ? p : { id: p, verified: false }
+        })
+        setPlayerData(dataMap)
       }
       
       // Load individual player stats
@@ -132,12 +138,21 @@ function App() {
     setToasts(prev => prev.filter(toast => toast.id !== id))
   }
 
-  const handlePlayerAdded = async (playerId) => {
+  const handlePlayerAdded = async (playerId, playerInfo = null) => {
     setPlayers(prev => [...prev, playerId])
     if (!activePlayerId) {
       setActivePlayerId(playerId)
       localStorage.setItem('activePlayerId', playerId)
     }
+    
+    // Update player data if provided
+    if (playerInfo) {
+      setPlayerData(prev => ({
+        ...prev,
+        [playerId]: playerInfo
+      }))
+    }
+    
     addActivity(`Added player: ${playerId}`, 'success')
     await loadPlayerStats([...players, playerId])
   }
@@ -210,8 +225,20 @@ function App() {
         <div className="header-icon">
           <GiftIcon size={48} />
         </div>
-        <h1>Matry's Giftcode Automation</h1>
-        <p className="subtitle">This tool claims gifts for you automatically, just add your player id and enjoy :)</p>
+        <div className="header-content">
+          <h1>Matry's Giftcode Automation</h1>
+          <p className="subtitle">This tool claims gifts for you automatically, just add your player id and enjoy :)</p>
+          {activePlayerId && playerData[activePlayerId]?.verificationData && (
+            <div className="active-player-info">
+              <span className="active-player-label">Logged in as:</span>
+              <span className="active-player-name">
+                {playerData[activePlayerId].verificationData.player_name || 
+                 playerData[activePlayerId].verificationData.name || 
+                 activePlayerId}
+              </span>
+            </div>
+          )}
+        </div>
       </header>
 
       <main className="main-content">
@@ -219,6 +246,7 @@ function App() {
           <PlayerManagement
             players={players}
             activePlayerId={activePlayerId}
+            playerData={playerData}
             onPlayerAdded={handlePlayerAdded}
             onPlayerRemoved={handlePlayerRemoved}
             onDetachPlayer={handleDetachPlayer}

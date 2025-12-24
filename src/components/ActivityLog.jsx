@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import ReCAPTCHA from 'react-google-recaptcha'
+import VerificationModal from './VerificationModal'
 import '../App.css'
 
 const API_BASE = '/.netlify/functions'
@@ -8,6 +9,7 @@ function ActivityLog({ activities, players, activePlayerId, showToast, onCodeCla
   const [codes, setCodes] = useState([])
   const [loading, setLoading] = useState(true)
   const [claimingCodes, setClaimingCodes] = useState({})
+  const [verificationModal, setVerificationModal] = useState({ isOpen: false, giftCode: null })
   const recaptchaRefs = useRef({})
 
   useEffect(() => {
@@ -43,21 +45,13 @@ function ActivityLog({ activities, players, activePlayerId, showToast, onCodeCla
     }
   }
 
-  const promptVerificationCode = () => {
-    return prompt('Enter 6-digit verification code:') || ''
-  }
-
   const handleClaimCode = async (giftCode, playerId) => {
     if (!activePlayerId) {
       showToast('Please add a Player ID first', 'error')
       return
     }
 
-    const verificationCode = promptVerificationCode()
-    if (!verificationCode || !/^\d{6}$/.test(verificationCode)) {
-      showToast('Invalid verification code. Must be 6 digits.', 'error')
-      return
-    }
+    // No verification code required for single player claims
 
     const recaptchaRef = recaptchaRefs.current[`${playerId}-${giftCode}`]
     const recaptchaToken = recaptchaRef?.getValue()
@@ -74,7 +68,7 @@ function ActivityLog({ activities, players, activePlayerId, showToast, onCodeCla
       const response = await fetch(`${API_BASE}/claim-single-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId, giftCode, recaptchaToken, verificationCode })
+        body: JSON.stringify({ playerId, giftCode, recaptchaToken })
       })
 
       const data = await response.json()
@@ -106,7 +100,7 @@ function ActivityLog({ activities, players, activePlayerId, showToast, onCodeCla
     }
   }
 
-  const handleClaimForAll = async (giftCode) => {
+  const handleClaimForAllClick = (giftCode) => {
     if (!activePlayerId) {
       showToast('Please add a Player ID first', 'error')
       return
@@ -117,13 +111,13 @@ function ActivityLog({ activities, players, activePlayerId, showToast, onCodeCla
       return
     }
 
-    const verificationCode = promptVerificationCode()
+    // Open verification modal
+    setVerificationModal({ isOpen: true, giftCode })
+  }
+
+  const handleClaimForAll = async (giftCode, verificationCode) => {
     if (!verificationCode || !/^\d{6}$/.test(verificationCode)) {
       showToast('Invalid verification code. Must be 6 digits.', 'error')
-      return
-    }
-
-    if (!window.confirm(`Redeem gift code "${giftCode}" for all ${players.length} player(s)?`)) {
       return
     }
 
@@ -255,7 +249,7 @@ function ActivityLog({ activities, players, activePlayerId, showToast, onCodeCla
                 </button>
                 {players.length > 0 && (
                   <button
-                    onClick={() => handleClaimForAll(codeData.code)}
+                    onClick={() => handleClaimForAllClick(codeData.code)}
                     className="btn btn-small btn-success"
                     style={{ marginTop: '0.5rem' }}
                   >
@@ -291,6 +285,18 @@ function ActivityLog({ activities, players, activePlayerId, showToast, onCodeCla
           </div>
         </div>
       )}
+
+      {/* Verification Modal */}
+      <VerificationModal
+        isOpen={verificationModal.isOpen}
+        onClose={() => setVerificationModal({ isOpen: false, giftCode: null })}
+        onConfirm={(verificationCode) => {
+          setVerificationModal({ isOpen: false, giftCode: null })
+          handleClaimForAll(verificationModal.giftCode, verificationCode)
+        }}
+        title="Claim for All Players"
+        message={`Enter the 6-digit verification code to claim "${verificationModal.giftCode}" for all ${players.length} player(s).`}
+      />
     </div>
   )
 }
