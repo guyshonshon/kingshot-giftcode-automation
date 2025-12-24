@@ -7,6 +7,14 @@ const { logAuditEvent } = require('./utils/audit-log')
  * 
  * Dates from kingshot.net are in UTC timezone (Z suffix)
  * Example: "2026-01-05T00:00:00.000Z" or "2025-12-24T23:59:00.000Z"
+ * 
+ * To configure as a scheduled function in Netlify:
+ * 1. Go to Site Settings > Functions > Scheduled Functions
+ * 2. Add new scheduled function
+ * 3. Function: check-expired-codes
+ * 4. Schedule: "0 * * * *" (every hour in UTC)
+ * 
+ * Or use external cron service (e.g., cron-job.org) to call this endpoint
  */
 async function scrapeGiftCodes() {
   return new Promise((resolve, reject) => {

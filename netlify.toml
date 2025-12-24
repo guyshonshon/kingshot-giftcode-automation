@@ -15,11 +15,8 @@
   included_files = ["netlify/functions/**"]
 
 # Scheduled function to check for expired codes
-# Runs every hour at minute 0 (e.g., 1:00, 2:00, 3:00, etc.)
-# Uses UTC timezone to match kingshot.net's date format
-[[plugins]]
-  package = "@netlify/plugin-scheduled-functions"
-
-[functions.check-expired-codes]
-  schedule = "0 * * * *"  # Every hour (UTC)
+# Configure in Netlify UI: Site Settings > Functions > Scheduled Functions
+# Schedule: "0 * * * *" (every hour in UTC)
+# Or use external cron service to call the function endpoint
+# Note: Function is restricted to scheduled calls only (no manual HTTP access)
 
