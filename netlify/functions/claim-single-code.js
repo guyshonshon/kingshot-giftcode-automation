@@ -187,11 +187,21 @@ async function redeemGiftCode(playerId, giftCode) {
       res.on('end', () => {
         try {
           const json = JSON.parse(data)
+          // More lenient success detection - code 0 or 1 might both be success
+          // Also check if msg contains success keywords
           const isSuccess = res.statusCode === 200 && (
             json.code === 0 || 
+            (json.code === 1 && json.msg && (json.msg.toLowerCase().includes('success') || json.msg.toLowerCase().includes('claimed'))) ||
             json.success === true || 
             json.status === 'success' ||
-            (json.msg && !json.msg.toLowerCase().includes('error') && !json.msg.toLowerCase().includes('fail'))
+            (json.msg && 
+             !json.msg.toLowerCase().includes('error') && 
+             !json.msg.toLowerCase().includes('fail') &&
+             !json.msg.toLowerCase().includes('invalid') &&
+             !json.msg.toLowerCase().includes('not found') &&
+             (json.msg.toLowerCase().includes('success') || 
+              json.msg.toLowerCase().includes('claimed') ||
+              json.msg.toLowerCase().includes('redeem')))
           )
           resolve({ 
             success: isSuccess, 
@@ -199,9 +209,14 @@ async function redeemGiftCode(playerId, giftCode) {
             statusCode: res.statusCode 
           })
         } catch (e) {
+          // If response is not JSON, check if it contains success indicators
+          const isSuccess = res.statusCode === 200 && (
+            data.toLowerCase().includes('success') || 
+            data.toLowerCase().includes('claimed')
+          )
           resolve({ 
-            success: res.statusCode === 200 && data.includes('success'), 
-            data: { raw: data }, 
+            success: isSuccess, 
+            data: { raw: data, parseError: e.message }, 
             statusCode: res.statusCode,
             error: 'Invalid JSON response'
           })
@@ -210,6 +225,7 @@ async function redeemGiftCode(playerId, giftCode) {
     })
 
     req.on('error', (error) => {
+      console.error('Request error in redeemGiftCode:', error)
       reject(error)
     })
 
@@ -326,13 +342,20 @@ exports.handler = async (event, context) => {
     const loginResult = await loginPlayer(playerId)
     
     if (!loginResult.success) {
+      const loginError = loginResult.data?.msg || loginResult.error || 'Unknown login error'
+      console.error('Login failed for player:', playerId, 'Error:', loginError, 'Status:', loginResult.statusCode)
+      await logSingleCodeClaim(event, context, playerId, giftCode, false, `Login failed: ${loginError}`)
       return {
         statusCode: 500,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ error: 'Login failed' })
+        body: JSON.stringify({ 
+          error: 'Login failed',
+          message: loginError,
+          details: loginResult.data
+        })
       }
     }
 
@@ -340,6 +363,13 @@ exports.handler = async (event, context) => {
 
     // Redeem gift code
     const redeemResult = await redeemGiftCode(playerId, giftCode)
+    
+    console.log('Redemption result for', playerId, 'code', giftCode, ':', {
+      success: redeemResult.success,
+      statusCode: redeemResult.statusCode,
+      data: redeemResult.data,
+      error: redeemResult.error
+    })
     
     if (redeemResult.success) {
       await markAsClaimed(playerId, giftCode)
@@ -376,9 +406,18 @@ exports.handler = async (event, context) => {
         })
       }
     } else {
-      const errorMsg = redeemResult.data?.msg || 'Unknown error'
+      // Extract detailed error message
+      const errorMsg = redeemResult.data?.msg || 
+                      redeemResult.data?.message || 
+                      redeemResult.error || 
+                      `API returned status ${redeemResult.statusCode}`
+      const errorCode = redeemResult.data?.code
+      const fullError = errorCode !== undefined ? `[Code ${errorCode}] ${errorMsg}` : errorMsg
+      
+      console.error('Redemption failed for player:', playerId, 'code:', giftCode, 'Error:', fullError, 'Response:', redeemResult.data)
+      
       // Log audit event
-      await logSingleCodeClaim(event, context, playerId, giftCode, false, errorMsg)
+      await logSingleCodeClaim(event, context, playerId, giftCode, false, fullError)
       
       return {
         statusCode: 500,
@@ -388,7 +427,9 @@ exports.handler = async (event, context) => {
         },
         body: JSON.stringify({ 
           error: 'Redemption failed',
-          message: errorMsg
+          message: fullError,
+          details: redeemResult.data,
+          statusCode: redeemResult.statusCode
         })
       }
     }
