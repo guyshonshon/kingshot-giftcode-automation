@@ -225,7 +225,8 @@ async function scrapeGiftCodes() {
   })
 }
 
-exports.handler = async (event, context) => {
+// Netlify handler
+const handler = async (event, context) => {
   // This can be called via scheduled function or manually
   if (event.httpMethod && event.httpMethod !== 'POST') {
     return {
@@ -389,5 +390,13 @@ exports.handler = async (event, context) => {
       })
     }
   }
+
 }
+
+// Export for both Netlify and Vercel
+exports.handler = handler
+
+// Vercel format
+const { createVercelHandler } = require('./_vercel-wrapper')
+module.exports = createVercelHandler(handler)}
 

@@ -104,7 +104,8 @@ function isCodeExpired(expirationDate) {
  * Main handler - only accessible via scheduled function
  * Manual calls are not allowed for security
  */
-exports.handler = async (event, context) => {
+// Netlify handler
+const handler = async (event, context) => {
   // Only allow scheduled function calls (no httpMethod)
   // Block all manual HTTP requests
   if (event.httpMethod) {
@@ -208,5 +209,13 @@ exports.handler = async (event, context) => {
       })
     }
   }
+
 }
+
+// Export for both Netlify and Vercel
+exports.handler = handler
+
+// Vercel format
+const { createVercelHandler } = require('./_vercel-wrapper')
+module.exports = createVercelHandler(handler)}
 

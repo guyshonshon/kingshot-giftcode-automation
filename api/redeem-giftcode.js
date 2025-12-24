@@ -161,7 +161,8 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-exports.handler = async (event, context) => {
+// Netlify handler
+const handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -362,5 +363,13 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ error: 'Failed to redeem gift code: ' + error.message })
     }
   }
+
 }
+
+// Export for both Netlify and Vercel
+exports.handler = handler
+
+// Vercel format
+const { createVercelHandler } = require('./_vercel-wrapper')
+module.exports = createVercelHandler(handler)}
 

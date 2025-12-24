@@ -12,7 +12,8 @@ async function ensureClaimsFile() {
   }
 }
 
-exports.handler = async (event, context) => {
+// Netlify handler
+const handler = async (event, context) => {
   if (event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
@@ -90,5 +91,13 @@ exports.handler = async (event, context) => {
       })
     }
   }
+
 }
+
+// Export for both Netlify and Vercel
+exports.handler = handler
+
+// Vercel format
+const { createVercelHandler } = require('./_vercel-wrapper')
+module.exports = createVercelHandler(handler)}
 
