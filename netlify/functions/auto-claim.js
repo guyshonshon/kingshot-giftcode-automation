@@ -5,7 +5,7 @@ const { logAutoClaim } = require('./utils/audit-log')
 
 const DATA_FILE = path.join('/tmp', 'players.json')
 const CLAIMS_FILE = path.join('/tmp', 'claims.json')
-const VERIFICATION_CODE = process.env.VERIFICATION_CODE || '0228'
+const VERIFICATION_CODE = process.env.VERIFICATION_CODE || '670069'
 
 async function ensureDataFile() {
   try {

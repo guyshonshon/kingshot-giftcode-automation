@@ -4,7 +4,7 @@ import '../App.css'
 
 const API_BASE = '/.netlify/functions'
 
-function PlayerManagement({ players, onPlayerAdded, onPlayerRemoved, addActivity, onCodeClaimed }) {
+function PlayerManagement({ players, activePlayerId, onPlayerAdded, onPlayerRemoved, onDetachPlayer, addActivity, showToast, onCodeClaimed }) {
   const [playerId, setPlayerId] = useState('')
   const [loading, setLoading] = useState(false)
   const [claimingPlayerId, setClaimingPlayerId] = useState(null)
@@ -21,6 +21,9 @@ function PlayerManagement({ players, onPlayerAdded, onPlayerRemoved, addActivity
   const loadPlayerData = async () => {
     try {
       const response = await fetch(`${API_BASE}/get-players`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch')
+      }
       const data = await response.json()
       if (data.playersData) {
         const dataMap = {}
@@ -31,6 +34,7 @@ function PlayerManagement({ players, onPlayerAdded, onPlayerRemoved, addActivity
         setPlayerData(dataMap)
       }
     } catch (error) {
+      // Silently fail - functions may not be available in dev
       console.error('Error loading player data:', error)
     }
   }
@@ -41,17 +45,17 @@ function PlayerManagement({ players, onPlayerAdded, onPlayerRemoved, addActivity
     const trimmedId = playerId.trim()
     
     if (!trimmedId) {
-      addActivity('Please enter a Player ID', 'error')
+      showToast('Please enter a Player ID', 'error')
       return
     }
     
-    if (!/^\d{10}$/.test(trimmedId)) {
-      addActivity('Player ID must be exactly 10 digits', 'error')
+    if (!/^\d{8,10}$/.test(trimmedId)) {
+      showToast('Player ID must be 8-10 digits', 'error')
       return
     }
     
     if (players.includes(trimmedId)) {
-      addActivity('Player ID already exists', 'error')
+      showToast('Player ID already exists', 'error')
       return
     }
     
@@ -72,7 +76,18 @@ function PlayerManagement({ players, onPlayerAdded, onPlayerRemoved, addActivity
         body: JSON.stringify({ playerId: trimmedId, recaptchaToken })
       })
       
-      const data = await response.json()
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        // If response is not JSON (e.g., HTML error page), show helpful message
+        if (!response.ok) {
+          showToast('Functions not available. Run "netlify dev" to test locally.', 'error')
+          setLoading(false)
+          return
+        }
+        throw jsonError
+      }
       
       if (data.success) {
         setPlayerId('')
@@ -90,17 +105,18 @@ function PlayerManagement({ players, onPlayerAdded, onPlayerRemoved, addActivity
             }
           }))
           
-          addActivity(`✓ Player ${trimmedId} verified and added successfully`, 'success')
+          showToast(`Player ${trimmedId} verified and added successfully`, 'success')
         } else {
-          addActivity(`Added player: ${trimmedId}`, 'success')
+          showToast(`Added player: ${trimmedId}`, 'success')
         }
       } else {
         const errorMsg = data.message || data.error || 'Failed to add player'
-        addActivity(`✗ ${errorMsg}`, 'error')
+        showToast(errorMsg, 'error')
         addRecaptchaRef.current?.reset()
       }
     } catch (error) {
-      addActivity('Error adding player', 'error')
+      console.error('Error adding player:', error)
+      showToast('Error adding player. Check console for details.', 'error')
       addRecaptchaRef.current?.reset()
     } finally {
       setLoading(false)
@@ -185,7 +201,18 @@ function PlayerManagement({ players, onPlayerAdded, onPlayerRemoved, addActivity
 
   return (
     <div className="section">
-      <h2 className="section-title">Player ID Management</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h2 className="section-title" style={{ margin: 0 }}>Player ID Management</h2>
+        {activePlayerId && (
+          <button
+            onClick={onDetachPlayer}
+            className="btn btn-danger btn-small"
+            style={{ fontSize: '0.85rem' }}
+          >
+            Detach Player ID
+          </button>
+        )}
+      </div>
       
       <form onSubmit={handleAddPlayer} className="add-player-form">
         <div className="input-row">
@@ -193,9 +220,9 @@ function PlayerManagement({ players, onPlayerAdded, onPlayerRemoved, addActivity
             type="text"
             value={playerId}
             onChange={(e) => setPlayerId(e.target.value.replace(/\D/g, '').slice(0, 10))}
-            placeholder="Enter Player ID (10 digits)"
+            placeholder="Enter Player ID (8-10 digits)"
             maxLength="10"
-            pattern="[0-9]{10}"
+            pattern="[0-9]{8,10}"
             disabled={loading}
             className="input-field"
           />

@@ -153,7 +153,7 @@ exports.handler = async (event, context) => {
       }
     }
 
-    if (!playerId || !/^\d{10}$/.test(playerId)) {
+    if (!playerId || !/^\d{8,10}$/.test(playerId)) {
       await logPlayerAdded(event, context, playerId || 'invalid', false)
       return {
         statusCode: 400,
@@ -161,7 +161,7 @@ exports.handler = async (event, context) => {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ error: 'Invalid player ID. Must be exactly 10 digits.' })
+        body: JSON.stringify({ error: 'Invalid player ID. Must be 8-10 digits.' })
       }
     }
 

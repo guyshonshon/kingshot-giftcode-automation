@@ -6,6 +6,7 @@ import Statistics from './components/Statistics'
 import ActivityLog from './components/ActivityLog'
 import TermsOfService from './components/TermsOfService'
 import MessageBanner from './components/MessageBanner'
+import ToastContainer from './components/ToastContainer'
 import GiftIcon from './components/GiftIcon'
 
 const API_BASE = '/.netlify/functions'
@@ -13,7 +14,10 @@ const API_BASE = '/.netlify/functions'
 function App() {
   const [showTOS, setShowTOS] = useState(false)
   const [players, setPlayers] = useState([])
-  const [activePlayerId, setActivePlayerId] = useState(null) // Currently selected/logged in player
+  const [activePlayerId, setActivePlayerId] = useState(() => {
+    // Load from localStorage on init
+    return localStorage.getItem('activePlayerId') || null
+  })
   const [stats, setStats] = useState({
     totalGifts: 0,
     successfulRedeems: 0,
@@ -22,6 +26,7 @@ function App() {
   const [playerStats, setPlayerStats] = useState({}) // Individual player stats
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
+  const [toasts, setToasts] = useState([])
 
   useEffect(() => {
     init()
@@ -40,9 +45,24 @@ function App() {
       const loadedPlayers = data.players || []
       setPlayers(loadedPlayers)
       
-      // Set first player as active if none is set
+      // Set first player as active if none is set and it exists in the list
       if (loadedPlayers.length > 0 && !activePlayerId) {
-        setActivePlayerId(loadedPlayers[0])
+        const savedId = localStorage.getItem('activePlayerId')
+        if (savedId && loadedPlayers.includes(savedId)) {
+          setActivePlayerId(savedId)
+        } else {
+          setActivePlayerId(loadedPlayers[0])
+          localStorage.setItem('activePlayerId', loadedPlayers[0])
+        }
+      } else if (activePlayerId && !loadedPlayers.includes(activePlayerId)) {
+        // Active player was removed, clear it
+        setActivePlayerId(null)
+        localStorage.removeItem('activePlayerId')
+      }
+      
+      // Load player data for PlayerManagement component
+      if (data.playersData) {
+        // This will be handled by PlayerManagement component
       }
       
       // Load individual player stats
@@ -51,7 +71,12 @@ function App() {
       }
     } catch (error) {
       console.error('Error loading players:', error)
-      addActivity('Error loading players', 'error')
+      if (error.message.includes('JSON')) {
+        // Netlify functions not available in dev - use netlify dev
+        showToast('Run "netlify dev" to test functions locally', 'warning', 5000)
+      } else {
+        showToast('Error loading players', 'error')
+      }
     }
   }
 
@@ -74,6 +99,9 @@ function App() {
       setStats(data.stats || stats)
     } catch (error) {
       console.error('Error loading stats:', error)
+      if (!error.message.includes('JSON')) {
+        showToast('Error loading stats', 'error')
+      }
     }
   }
 
@@ -95,10 +123,20 @@ function App() {
     setActivities(prev => [newActivity, ...prev].slice(0, 50))
   }
 
+  const showToast = (message, type = 'info', duration = 3000) => {
+    const id = Date.now()
+    setToasts(prev => [...prev, { id, message, type, duration }])
+  }
+
+  const removeToast = (id) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id))
+  }
+
   const handlePlayerAdded = async (playerId) => {
     setPlayers(prev => [...prev, playerId])
     if (!activePlayerId) {
       setActivePlayerId(playerId)
+      localStorage.setItem('activePlayerId', playerId)
     }
     addActivity(`Added player: ${playerId}`, 'success')
     await loadPlayerStats([...players, playerId])
@@ -108,12 +146,24 @@ function App() {
     setPlayers(prev => prev.filter(id => id !== playerId))
     if (activePlayerId === playerId) {
       const remaining = players.filter(id => id !== playerId)
-      setActivePlayerId(remaining.length > 0 ? remaining[0] : null)
+      const newActive = remaining.length > 0 ? remaining[0] : null
+      setActivePlayerId(newActive)
+      if (newActive) {
+        localStorage.setItem('activePlayerId', newActive)
+      } else {
+        localStorage.removeItem('activePlayerId')
+      }
     }
     addActivity(`Removed player: ${playerId}`, 'success')
     const newPlayerStats = { ...playerStats }
     delete newPlayerStats[playerId]
     setPlayerStats(newPlayerStats)
+  }
+
+  const handleDetachPlayer = () => {
+    setActivePlayerId(null)
+    localStorage.removeItem('activePlayerId')
+    showToast('Player ID detached. You can add a new one.', 'info')
   }
 
   const handleRedeemComplete = async (result) => {
@@ -153,7 +203,8 @@ function App() {
 
   return (
     <div className="app-container">
-      <MessageBanner totalGiftsRedeemed={stats.totalGifts} />
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <MessageBanner totalGiftsRedeemed={stats.totalGifts} hasPlayerId={!!activePlayerId} />
       
       <header className="app-header">
         <div className="header-icon">
@@ -167,9 +218,12 @@ function App() {
         <div className="top-sections">
           <PlayerManagement
             players={players}
+            activePlayerId={activePlayerId}
             onPlayerAdded={handlePlayerAdded}
             onPlayerRemoved={handlePlayerRemoved}
+            onDetachPlayer={handleDetachPlayer}
             addActivity={addActivity}
+            showToast={showToast}
             onCodeClaimed={() => loadPlayerStats(players)}
           />
 
@@ -177,6 +231,7 @@ function App() {
             players={players}
             onRedeemComplete={handleRedeemComplete}
             addActivity={addActivity}
+            showToast={showToast}
           />
         </div>
 
@@ -187,9 +242,11 @@ function App() {
           playerStats={playerStats}
         />
 
-        <ActivityLog 
-          activities={activities} 
-          players={players} 
+        <ActivityLog
+          activities={activities}
+          players={players}
+          activePlayerId={activePlayerId}
+          showToast={showToast}
           onCodeClaimed={() => loadPlayerStats(players)}
         />
       </main>

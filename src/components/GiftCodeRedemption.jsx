@@ -4,11 +4,10 @@ import '../App.css'
 
 const API_BASE = '/.netlify/functions'
 
-function GiftCodeRedemption({ players, onRedeemComplete, addActivity }) {
+function GiftCodeRedemption({ players, onRedeemComplete, addActivity, showToast }) {
   const [giftCode, setGiftCode] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
   const [loading, setLoading] = useState(false)
-  const [status, setStatus] = useState({ message: '', type: '' })
   const recaptchaRef = useRef(null)
 
   const handleRedeem = async (e) => {
@@ -18,17 +17,17 @@ function GiftCodeRedemption({ players, onRedeemComplete, addActivity }) {
     const trimmedVerification = verificationCode.trim()
     
     if (!trimmedCode) {
-      setStatus({ message: 'Please enter a gift code', type: 'error' })
+      showToast('Please enter a gift code', 'error')
       return
     }
     
-    if (!trimmedVerification || !/^\d{4}$/.test(trimmedVerification)) {
-      setStatus({ message: 'Please enter a valid 4-digit verification code', type: 'error' })
+    if (!trimmedVerification || !/^\d{6}$/.test(trimmedVerification)) {
+      showToast('Please enter a valid 6-digit verification code', 'error')
       return
     }
     
     if (players.length === 0) {
-      setStatus({ message: 'No players in the list', type: 'error' })
+      showToast('No players in the list', 'error')
       return
     }
     
@@ -36,7 +35,7 @@ function GiftCodeRedemption({ players, onRedeemComplete, addActivity }) {
     const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
     // Only require reCAPTCHA if site key is configured
     if (recaptchaSiteKey && recaptchaSiteKey !== '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI' && !recaptchaToken) {
-      setStatus({ message: 'Please complete the reCAPTCHA verification', type: 'error' })
+      showToast('Please complete the reCAPTCHA verification', 'error')
       return
     }
     
@@ -45,7 +44,7 @@ function GiftCodeRedemption({ players, onRedeemComplete, addActivity }) {
     }
     
     setLoading(true)
-    setStatus({ message: 'Processing...', type: 'info' })
+    showToast('Processing...', 'info', 2000)
     
     try {
       const response = await fetch(`${API_BASE}/redeem-giftcode`, {
@@ -65,29 +64,24 @@ function GiftCodeRedemption({ players, onRedeemComplete, addActivity }) {
         setGiftCode('')
         setVerificationCode('')
         recaptchaRef.current?.reset()
-        setStatus({
-          message: `Redeemed for ${data.successCount || 0} player(s). ${data.failCount || 0} failed.`,
-          type: data.failCount > 0 ? 'warning' : 'success'
-        })
+        showToast(
+          `Redeemed for ${data.successCount || 0} player(s). ${data.failCount || 0} failed.`,
+          data.failCount > 0 ? 'warning' : 'success'
+        )
         onRedeemComplete({
           giftCode: trimmedCode,
           successCount: data.successCount || 0,
           failCount: data.failCount || 0
         })
       } else {
-        setStatus({ message: data.error || 'Failed to redeem gift code', type: 'error' })
-        addActivity(`Failed to redeem "${trimmedCode}"`, 'error')
+        showToast(data.error || 'Failed to redeem gift code', 'error')
         recaptchaRef.current?.reset()
       }
     } catch (error) {
-      setStatus({ message: 'Error redeeming gift code', type: 'error' })
-      addActivity('Error redeeming gift code', 'error')
+      showToast('Error redeeming gift code', 'error')
       recaptchaRef.current?.reset()
     } finally {
       setLoading(false)
-      setTimeout(() => {
-        setStatus({ message: '', type: '' })
-      }, 5000)
     }
   }
 
@@ -109,9 +103,9 @@ function GiftCodeRedemption({ players, onRedeemComplete, addActivity }) {
           <input
             type="text"
             value={verificationCode}
-            onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-            placeholder="4-Digit Code"
-            maxLength="4"
+            onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="6-Digit Code"
+            maxLength="6"
             disabled={loading}
             className="input-field"
             style={{ maxWidth: '150px' }}
@@ -139,11 +133,6 @@ function GiftCodeRedemption({ players, onRedeemComplete, addActivity }) {
         </button>
       </form>
 
-      {status.message && (
-        <div className={`status-info status-${status.type}`} style={{ marginTop: '1rem' }}>
-          {status.message}
-        </div>
-      )}
     </div>
   )
 }

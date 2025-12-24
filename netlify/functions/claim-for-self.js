@@ -7,7 +7,7 @@ const DATA_FILE = path.join('/tmp', 'players.json')
 const CLAIMS_FILE = path.join('/tmp', 'claims.json')
 const RECENT_CODES_FILE = path.join('/tmp', 'recent-codes.json')
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY
-const VERIFICATION_CODE = process.env.VERIFICATION_CODE || '0228'
+const VERIFICATION_CODE = process.env.VERIFICATION_CODE || '670069'
 
 async function verifyRecaptcha(token) {
   if (!RECAPTCHA_SECRET_KEY) {

@@ -93,8 +93,8 @@ The application includes comprehensive audit logging using **Netlify Blobs** for
 1. **VERIFICATION_CODE** (Required)
    - A 4-digit code required for gift code redemption
    - Set in: Netlify Dashboard → Site settings → Environment variables
-   - Example: `VERIFICATION_CODE=0228`
-   - Defaults to `0228` for development
+   - Example: `VERIFICATION_CODE=670069`
+   - Defaults to `670069` for development (6-digit code)
 
 **Optional Environment Variables:**
 

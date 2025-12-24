@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react'
 import '../App.css'
 
-function MessageBanner({ totalGiftsRedeemed }) {
+function MessageBanner({ totalGiftsRedeemed, hasPlayerId }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isVisible, setIsVisible] = useState(true)
 
-  const getMessages = () => [
-    "Lord freedom is Pay to Win",
-    `Did you know? A total of ${totalGiftsRedeemed} gifts has been redeemed automagically so far!`
-  ]
+  const getMessages = () => {
+    const messages = [
+      "Lord freedom is Pay to Win",
+      `Did you know? A total of ${totalGiftsRedeemed} gifts has been redeemed automagically so far!`
+    ]
+    
+    if (!hasPlayerId) {
+      messages.push("Add your Player ID to start claiming gift codes automatically!")
+    }
+    
+    return messages
+  }
 
   useEffect(() => {
     const messages = getMessages()

@@ -91,7 +91,7 @@ kingshot-giftcode-automation/
 
 ## Notes
 
-- Player IDs must be exactly 10 digits
+- Player IDs must be 8-10 digits
 - Gift codes can be up to 20 characters
 - Data is stored in `/tmp` directory (ephemeral on Netlify)
 - For persistent storage, consider using a database service

@@ -38,52 +38,111 @@ async function scrapeGiftCodes() {
       res.on('end', () => {
         try {
           const activeCodes = []
-          const activeSectionMatch = data.match(/## Active Gift Codes[\s\S]*?(?=## Expired Gift Codes|$)/i)
-          if (activeSectionMatch) {
-            const activeSection = activeSectionMatch[0]
-            const foundCodes = new Set()
-            
-            const codePatterns = [
-              /\b([A-Z0-9]{6,20})\b/g,
-              /(?:Copy|Quick Redeem|Share)[\s\S]*?\b([A-Z0-9]{6,20})\b/gi
-            ]
-            
-            codePatterns.forEach(pattern => {
-              let match
-              while ((match = pattern.exec(activeSection)) !== null) {
-                const code = match[1] || match[0]
-                const upperCode = code.toUpperCase().trim()
-                const excludeList = ['ACTIVE', 'EXPIRED', 'EXPIRES', 'COPY', 'QUICK', 'REDEEM', 'SHARE']
-                if (upperCode.length >= 6 && upperCode.length <= 20 && 
-                    !excludeList.includes(upperCode) && /^[A-Z0-9]+$/.test(upperCode)) {
-                  foundCodes.add(upperCode)
-                }
-              }
-            })
-            
-            activeCodes.push(...Array.from(foundCodes))
-          }
+          const expiredCodes = []
           
-          if (activeCodes.length === 0) {
-            const allCodeMatches = data.match(/\b([A-Z0-9]{8,15})\b/g)
-            if (allCodeMatches) {
-              const uniqueCodes = new Set()
-              allCodeMatches.forEach(code => {
-                const upperCode = code.toUpperCase()
-                if (upperCode.length >= 6 && upperCode.length <= 20 && 
-                    /^[A-Z0-9]+$/.test(upperCode)) {
-                  const codeIndex = data.indexOf(upperCode)
-                  const expiredIndex = data.indexOf('Expired Gift Codes', codeIndex)
-                  if (expiredIndex === -1 || codeIndex < expiredIndex) {
-                    uniqueCodes.add(upperCode)
+          // Extract Active Gift Codes section
+          const activeSectionMatch = data.match(/## Active Gift Codes([\s\S]*?)(?:## Expired Gift Codes|$)/i)
+          if (activeSectionMatch) {
+            const activeSection = activeSectionMatch[1]
+            const foundActive = new Set()
+            
+            // Split by "Active" markers to get individual code blocks
+            const activeBlocks = activeSection.split(/Active\s+/i).filter(block => block.trim().length > 0)
+            
+            activeBlocks.forEach(block => {
+              // Extract code - look for standalone code on a line
+              const lines = block.split(/\n/).map(l => l.trim()).filter(l => l.length > 0)
+              
+              let code = null
+              let expiration = null
+              
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i]
+                
+                // Check if this line is a code (4-20 alphanumeric chars, standalone)
+                const codeMatch = line.match(/^([A-Z0-9]{4,20})$/i)
+                if (codeMatch && !code) {
+                  const potentialCode = codeMatch[1].toUpperCase().trim()
+                  const excludeList = ['ACTIVE', 'EXPIRED', 'EXPIRES', 'COPY', 'QUICK', 'REDEEM', 'SHARE', 'GIFT', 'CODES']
+                  if (!excludeList.includes(potentialCode) && /^[A-Z0-9]+$/.test(potentialCode)) {
+                    code = potentialCode
                   }
                 }
-              })
-              activeCodes.push(...Array.from(uniqueCodes))
-            }
+                
+                // Check for expiration date
+                const expirationMatch = line.match(/Expires:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)
+                if (expirationMatch) {
+                  expiration = expirationMatch[1].trim()
+                }
+                
+                // If we found both code and expiration, or code and we're at the end, break
+                if (code && (expiration || i === lines.length - 1)) {
+                  break
+                }
+              }
+              
+              if (code && !foundActive.has(code)) {
+                foundActive.add(code)
+                activeCodes.push({ code, expiration, isExpired: false })
+              }
+            })
           }
           
-          resolve([...new Set(activeCodes)])
+          // Extract Expired Gift Codes section
+          const expiredSectionMatch = data.match(/## Expired Gift Codes([\s\S]*?)(?:##|$)/i)
+          if (expiredSectionMatch) {
+            const expiredSection = expiredSectionMatch[1]
+            const foundExpired = new Set()
+            
+            // Split by "Expired" markers to get individual code blocks
+            const expiredBlocks = expiredSection.split(/Expired\s+/i).filter(block => block.trim().length > 0)
+            
+            expiredBlocks.forEach(block => {
+              // Skip if this block contains "Expired At" in the first part (it's part of previous block)
+              if (/Expired At:/i.test(block.split(/\n/)[0])) {
+                return
+              }
+              
+              // Extract code - look for standalone code on a line
+              const lines = block.split(/\n/).map(l => l.trim()).filter(l => l.length > 0)
+              
+              let code = null
+              let expiration = null
+              
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i]
+                
+                // Check if this line is a code (4-20 alphanumeric chars, standalone)
+                const codeMatch = line.match(/^([A-Z0-9]{4,20})$/i)
+                if (codeMatch && !code) {
+                  const potentialCode = codeMatch[1].toUpperCase().trim()
+                  const excludeList = ['EXPIRED', 'EXPIRES', 'GIFT', 'CODES', 'SPECIFIED', 'YET', 'EXPIRATION', 'AT']
+                  if (!excludeList.includes(potentialCode) && /^[A-Z0-9]+$/.test(potentialCode)) {
+                    code = potentialCode
+                  }
+                }
+                
+                // Check for expiration date
+                const expiredAtMatch = line.match(/Expired At:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)
+                if (expiredAtMatch) {
+                  expiration = expiredAtMatch[1].trim()
+                }
+                
+                // If we found both code and expiration, or code and we're at the end, break
+                if (code && (expiration || i === lines.length - 1)) {
+                  break
+                }
+              }
+              
+              if (code && !foundExpired.has(code) && !activeCodes.find(ac => ac.code === code)) {
+                foundExpired.add(code)
+                expiredCodes.push({ code, expiration, isExpired: true })
+              }
+            })
+          }
+          
+          // Return both active and expired codes
+          resolve({ active: activeCodes, expired: expiredCodes })
         } catch (error) {
           reject(error)
         }
@@ -112,8 +171,8 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Get active codes
-    const activeCodes = await scrapeGiftCodes()
+    // Get active and expired codes
+    const { active: activeCodes, expired: expiredCodes } = await scrapeGiftCodes()
     
     // Get claims data
     await ensureClaimsFile()
@@ -130,8 +189,12 @@ exports.handler = async (event, context) => {
       // File might not exist yet
     }
     
-    // Build codes with claim info
-    const codesWithClaims = activeCodes.map(code => {
+    // Helper function to build code with claim info
+    const buildCodeWithClaims = (codeObj) => {
+      const code = codeObj.code
+      const expiration = codeObj.expiration
+      const isExpired = codeObj.isExpired || false
+      
       const playersWhoClaimed = []
       Object.keys(claims).forEach(playerId => {
         if (claims[playerId] && claims[playerId].includes(code)) {
@@ -142,13 +205,50 @@ exports.handler = async (event, context) => {
       // Find in recent codes for timestamp
       const recentCodeInfo = recentCodesData.find(rc => rc.code === code)
       
+      // Parse expiration date for sorting
+      let expirationDate = null
+      if (expiration) {
+        try {
+          // Parse MM/DD/YYYY format
+          const parts = expiration.split('/')
+          if (parts.length === 3) {
+            const month = parseInt(parts[0], 10) - 1
+            const day = parseInt(parts[1], 10)
+            const year = parseInt(parts[2], 10)
+            const parsed = new Date(year, month, day)
+            if (!isNaN(parsed.getTime())) {
+              expirationDate = parsed.toISOString()
+            }
+          }
+        } catch (e) {
+          // Keep expiration as string if parsing fails
+        }
+      }
+      
       return {
         code,
+        expiration,
+        expirationDate,
+        isExpired,
         claimCount: playersWhoClaimed.length,
         players: playersWhoClaimed,
         timestamp: recentCodeInfo?.timestamp || null
       }
+    }
+    
+    // Build active codes with claim info
+    const activeCodesWithClaims = activeCodes.map(buildCodeWithClaims)
+    
+    // Sort active codes by expiration date (earliest first, then codes without expiration at the end)
+    activeCodesWithClaims.sort((a, b) => {
+      if (!a.expirationDate && !b.expirationDate) return 0
+      if (!a.expirationDate) return 1 // No expiration goes to end
+      if (!b.expirationDate) return -1
+      return new Date(a.expirationDate) - new Date(b.expirationDate)
     })
+    
+    // Build expired codes with claim info
+    const expiredCodesWithClaims = expiredCodes.map(buildCodeWithClaims)
     
     return {
       statusCode: 200,
@@ -158,7 +258,8 @@ exports.handler = async (event, context) => {
       },
       body: JSON.stringify({
         success: true,
-        codes: codesWithClaims
+        activeCodes: activeCodesWithClaims,
+        expiredCodes: expiredCodesWithClaims
       })
     }
   } catch (error) {

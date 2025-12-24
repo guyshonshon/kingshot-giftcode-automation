@@ -7,7 +7,7 @@ const DATA_FILE = path.join('/tmp', 'players.json')
 const CLAIMS_FILE = path.join('/tmp', 'claims.json')
 const RECENT_CODES_FILE = path.join('/tmp', 'recent-codes.json')
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY
-const VERIFICATION_CODE = process.env.VERIFICATION_CODE || '0228'
+const VERIFICATION_CODE = process.env.VERIFICATION_CODE || '670069'
 
 async function verifyRecaptcha(token) {
   if (!RECAPTCHA_SECRET_KEY) {
@@ -246,7 +246,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { playerId, giftCode, recaptchaToken } = JSON.parse(event.body)
+    const { playerId, giftCode, recaptchaToken, verificationCode } = JSON.parse(event.body)
 
     if (!playerId || !giftCode) {
       return {
@@ -256,6 +256,18 @@ exports.handler = async (event, context) => {
           'Access-Control-Allow-Origin': '*'
         },
         body: JSON.stringify({ error: 'Player ID and gift code are required' })
+      }
+    }
+
+    // Verify 6-digit code
+    if (!verificationCode || verificationCode !== VERIFICATION_CODE) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ error: 'Invalid verification code' })
       }
     }
 

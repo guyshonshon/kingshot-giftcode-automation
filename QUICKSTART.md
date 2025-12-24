@@ -41,7 +41,7 @@ netlify deploy --prod
 
 ### Step 4: Use Your App! 🎉
 
-1. Add your Player IDs (10 digits each)
+1. Add your Player IDs (8-10 digits each)
 2. Enter a gift code
 3. Click "Redeem for All Players"
 4. Watch the magic happen! ✨

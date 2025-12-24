@@ -9,7 +9,7 @@ const MAX_REQUESTS_PER_CODE = 100 // Max players per gift code
 const MIN_DELAY_MS = 500 // Minimum delay between requests (anti-spam)
 const RATE_LIMIT_WINDOW_MS = 3600000 // 1 hour window
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY
-const VERIFICATION_CODE = process.env.VERIFICATION_CODE || '0228' // Default for development
+const VERIFICATION_CODE = process.env.VERIFICATION_CODE || '670069' // Default for development
 
 async function verifyRecaptcha(token) {
   if (!RECAPTCHA_SECRET_KEY) {
@@ -209,7 +209,7 @@ exports.handler = async (event, context) => {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ error: 'Valid 4-digit verification code is required' })
+        body: JSON.stringify({ error: 'Valid 6-digit verification code is required' })
       }
     }
 
@@ -220,7 +220,7 @@ exports.handler = async (event, context) => {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ error: 'Invalid verification code' })
+        body: JSON.stringify({ error: 'Invalid 6-digit verification code' })
       }
     }
 

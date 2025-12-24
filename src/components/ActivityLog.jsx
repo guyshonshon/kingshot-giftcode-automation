@@ -4,7 +4,7 @@ import '../App.css'
 
 const API_BASE = '/.netlify/functions'
 
-function ActivityLog({ activities, players, onCodeClaimed }) {
+function ActivityLog({ activities, players, activePlayerId, showToast, onCodeClaimed }) {
   const [codes, setCodes] = useState([])
   const [loading, setLoading] = useState(true)
   const [claimingCodes, setClaimingCodes] = useState({})
@@ -20,24 +20,51 @@ function ActivityLog({ activities, players, onCodeClaimed }) {
   const loadCodes = async () => {
     try {
       const response = await fetch(`${API_BASE}/get-codes-with-claims`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch')
+      }
       const data = await response.json()
       if (data.success) {
-        setCodes(data.codes || [])
+        // Combine active and expired codes, with expired at the end
+        const allCodes = [
+          ...(data.activeCodes || []),
+          ...(data.expiredCodes || [])
+        ]
+        console.log('Loaded codes:', { active: data.activeCodes?.length || 0, expired: data.expiredCodes?.length || 0, total: allCodes.length })
+        setCodes(allCodes)
+      } else {
+        console.error('Failed to load codes:', data)
       }
     } catch (error) {
+      // Silently fail - functions may not be available in dev
       console.error('Error loading codes:', error)
     } finally {
       setLoading(false)
     }
   }
 
+  const promptVerificationCode = () => {
+    return prompt('Enter 6-digit verification code:') || ''
+  }
+
   const handleClaimCode = async (giftCode, playerId) => {
+    if (!activePlayerId) {
+      showToast('Please add a Player ID first', 'error')
+      return
+    }
+
+    const verificationCode = promptVerificationCode()
+    if (!verificationCode || !/^\d{6}$/.test(verificationCode)) {
+      showToast('Invalid verification code. Must be 6 digits.', 'error')
+      return
+    }
+
     const recaptchaRef = recaptchaRefs.current[`${playerId}-${giftCode}`]
     const recaptchaToken = recaptchaRef?.getValue()
     const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
     
     if (recaptchaSiteKey && recaptchaSiteKey !== '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI' && !recaptchaToken) {
-      alert('Please complete the reCAPTCHA verification')
+      showToast('Please complete the reCAPTCHA verification', 'error')
       return
     }
 
@@ -47,16 +74,16 @@ function ActivityLog({ activities, players, onCodeClaimed }) {
       const response = await fetch(`${API_BASE}/claim-single-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId, giftCode, recaptchaToken })
+        body: JSON.stringify({ playerId, giftCode, recaptchaToken, verificationCode })
       })
 
       const data = await response.json()
 
       if (data.success) {
         if (data.alreadyClaimed) {
-          alert(`Code ${giftCode} was already claimed for this player`)
+          showToast(`Code ${giftCode} was already claimed`, 'info')
         } else {
-          alert(`Successfully claimed code ${giftCode}`)
+          showToast(`Successfully claimed code ${giftCode}`, 'success')
           if (onCodeClaimed) {
             onCodeClaimed()
           }
@@ -64,11 +91,11 @@ function ActivityLog({ activities, players, onCodeClaimed }) {
         loadCodes() // Refresh the list
         recaptchaRef?.reset()
       } else {
-        alert(data.error || 'Failed to claim code')
+        showToast(data.error || 'Failed to claim code', 'error')
         recaptchaRef?.reset()
       }
     } catch (error) {
-      alert('Error claiming code')
+      showToast('Error claiming code', 'error')
       recaptchaRef?.reset()
     } finally {
       setClaimingCodes(prev => {
@@ -79,76 +106,205 @@ function ActivityLog({ activities, players, onCodeClaimed }) {
     }
   }
 
+  const handleClaimForAll = async (giftCode) => {
+    if (!activePlayerId) {
+      showToast('Please add a Player ID first', 'error')
+      return
+    }
+
+    if (players.length === 0) {
+      showToast('No players in the list', 'error')
+      return
+    }
+
+    const verificationCode = promptVerificationCode()
+    if (!verificationCode || !/^\d{6}$/.test(verificationCode)) {
+      showToast('Invalid verification code. Must be 6 digits.', 'error')
+      return
+    }
+
+    if (!window.confirm(`Redeem gift code "${giftCode}" for all ${players.length} player(s)?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/redeem-giftcode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          giftCode, 
+          verificationCode,
+          players 
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        showToast(`Redeemed for ${data.successCount || 0} player(s). ${data.failCount || 0} failed.`, data.failCount > 0 ? 'warning' : 'success')
+        if (onCodeClaimed) {
+          onCodeClaimed()
+        }
+        loadCodes()
+      } else {
+        showToast(data.error || 'Failed to redeem gift code', 'error')
+      }
+    } catch (error) {
+      showToast('Error redeeming gift code', 'error')
+    }
+  }
+
   const isCodeClaimedByPlayer = (code, playerId) => {
     return code.players && code.players.includes(playerId)
+  }
+
+  const handleCopyCode = async (code) => {
+    try {
+      // Use modern Clipboard API (cross-platform)
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(code)
+        showToast(`Code "${code}" copied to clipboard!`, 'success', 2000)
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea')
+        textArea.value = code
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+        showToast(`Code "${code}" copied to clipboard!`, 'success', 2000)
+      }
+    } catch (error) {
+      console.error('Failed to copy code:', error)
+      showToast('Failed to copy code to clipboard', 'error')
+    }
   }
 
   return (
     <div className="section">
       <h2 className="section-title">Active Codes</h2>
-      <div className="activity-log">
+      <div className="codes-grid">
         {loading ? (
           <div className="empty-state">Loading codes...</div>
         ) : codes.length === 0 ? (
           <div className="empty-state">No active codes found</div>
         ) : (
-          codes.map((codeData, index) => (
-            <div key={index} className="activity-item success">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.5rem' }}>
-                <div style={{ flex: 1, minWidth: '200px' }}>
-                  <strong style={{ color: 'var(--accent-color)', fontSize: '1.2em', display: 'block', marginBottom: '0.5rem' }}>
+          <>
+            {/* Active Codes */}
+            {codes.filter(c => !c.isExpired).sort((a, b) => {
+              // Sort by expiration date (earliest first)
+              if (!a.expirationDate && !b.expirationDate) return 0
+              if (!a.expirationDate) return 1
+              if (!b.expirationDate) return -1
+              return new Date(a.expirationDate) - new Date(b.expirationDate)
+            }).map((codeData, index) => (
+              <div key={`active-${index}`} className="code-card">
+                <div className="code-header">
+                  <strong 
+                    className="code-text code-text-clickable" 
+                    onClick={() => handleCopyCode(codeData.code)}
+                    title="Click to copy code"
+                  >
                     {codeData.code}
                   </strong>
-                  <div style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>
-                    {codeData.claimCount} player(s) claimed
+                  <div className="code-meta">
+                    {codeData.claimCount} claim{codeData.claimCount !== 1 ? 's' : ''}
                   </div>
-                  {codeData.players && codeData.players.length > 0 && (
-                    <div style={{ fontSize: '0.8em', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                      Players: {codeData.players.join(', ')}
-                    </div>
-                  )}
-                  {codeData.timestamp && (
-                    <div style={{ fontSize: '0.75em', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                      Last claimed: {new Date(codeData.timestamp).toLocaleString()}
-                    </div>
-                  )}
                 </div>
-                {players.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
-                    {players.map(playerId => {
-                      const isClaimed = isCodeClaimedByPlayer(codeData, playerId)
-                      const claimKey = `${playerId}-${codeData.code}`
-                      const isClaiming = claimingCodes[claimKey]
-                      
-                      return (
-                        <div key={playerId} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-end' }}>
-                          {import.meta.env.VITE_RECAPTCHA_SITE_KEY && 
-                           import.meta.env.VITE_RECAPTCHA_SITE_KEY !== '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI' && (
-                            <ReCAPTCHA
-                              ref={(ref) => {
-                                if (ref) recaptchaRefs.current[claimKey] = ref
-                              }}
-                              sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                              theme="dark"
-                              size="compact"
-                            />
-                          )}
-                          <button
-                            onClick={() => handleClaimCode(codeData.code, playerId)}
-                            disabled={isClaiming || isClaimed}
-                            className={`btn btn-small ${isClaimed ? 'btn-success' : 'btn-primary'}`}
-                            style={{ minWidth: '120px' }}
-                          >
-                            {isClaiming ? 'Claiming...' : isClaimed ? '✓ Claimed' : `Claim (${playerId.slice(-4)})`}
-                          </button>
-                        </div>
-                      )
-                    })}
+                
+                {codeData.players && codeData.players.length > 0 && (
+                  <div className="code-players">
+                    <small>Players: {codeData.players.join(', ')}</small>
                   </div>
                 )}
+
+                {codeData.expiration && (
+                  <div className="code-expiration">
+                    <small>⏰ Expires: {codeData.expiration}</small>
+                  </div>
+                )}
+                {!codeData.expiration && (
+                  <div className="code-expiration" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
+                    <small>No expiration date</small>
+                  </div>
+                )}
+
+              <div className="code-actions">
+                {import.meta.env.VITE_RECAPTCHA_SITE_KEY && 
+                 import.meta.env.VITE_RECAPTCHA_SITE_KEY !== '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI' && activePlayerId && (
+                  <ReCAPTCHA
+                    ref={(ref) => {
+                      if (ref) recaptchaRefs.current[`${activePlayerId}-${codeData.code}`] = ref
+                    }}
+                    sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                    theme="dark"
+                    size="compact"
+                  />
+                )}
+                <button
+                  onClick={() => activePlayerId && handleClaimCode(codeData.code, activePlayerId)}
+                  disabled={!activePlayerId || claimingCodes[`${activePlayerId}-${codeData.code}`] || isCodeClaimedByPlayer(codeData, activePlayerId)}
+                  className={`btn btn-small ${!activePlayerId ? 'btn-disabled' : isCodeClaimedByPlayer(codeData, activePlayerId) ? 'btn-success' : 'btn-primary'}`}
+                  title={!activePlayerId ? 'Add a Player ID to claim codes' : ''}
+                >
+                  {!activePlayerId ? 'Claim (Login Required)' : claimingCodes[`${activePlayerId}-${codeData.code}`] ? 'Claiming...' : isCodeClaimedByPlayer(codeData, activePlayerId) ? '✓ Claimed' : 'Claim'}
+                </button>
+                {players.length > 0 && (
+                  <button
+                    onClick={() => handleClaimForAll(codeData.code)}
+                    className="btn btn-small btn-success"
+                    style={{ marginTop: '0.5rem' }}
+                  >
+                    Claim for All
+                  </button>
+                )}
               </div>
-            </div>
-          ))
+              </div>
+            ))}
+            
+            {/* Separator */}
+            {codes.filter(c => c.isExpired).length > 0 && codes.filter(c => !c.isExpired).length > 0 && (
+              <div className="codes-separator">
+                <hr />
+                <h3 className="expired-section-title">Expired Gift Codes</h3>
+              </div>
+            )}
+            
+            {/* Expired Codes */}
+            {codes.filter(c => c.isExpired).map((codeData, index) => (
+              <div key={`expired-${index}`} className="code-card code-card-expired">
+                <div className="code-header">
+                  <strong className="code-text">{codeData.code}</strong>
+                  <div className="code-meta">
+                    {codeData.claimCount} claim{codeData.claimCount !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                
+                {codeData.players && codeData.players.length > 0 && (
+                  <div className="code-players">
+                    <small>Players: {codeData.players.join(', ')}</small>
+                  </div>
+                )}
+
+                {codeData.expiration && (
+                  <div className="code-expiration">
+                    <small>⏰ Expired: {codeData.expiration}</small>
+                  </div>
+                )}
+                
+                <div className="code-actions">
+                  <button
+                    disabled
+                    className="btn btn-small btn-disabled"
+                  >
+                    Expired
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
         )}
       </div>
     </div>
