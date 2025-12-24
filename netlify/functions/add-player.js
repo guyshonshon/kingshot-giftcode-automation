@@ -196,7 +196,20 @@ exports.handler = async (event, context) => {
       result = await addPlayer(playerData, context)
     } catch (error) {
       console.error('Error in addPlayer:', error)
-      throw new Error(`Failed to save player: ${error.message}`)
+      console.error('Error stack:', error.stack)
+      await logPlayerAdded(event, context, playerId, false)
+      return {
+        statusCode: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ 
+          error: 'Failed to save player',
+          message: error.message,
+          details: process.env.NETLIFY_DEV ? error.stack : undefined
+        })
+      }
     }
     
     if (!result.success) {
@@ -211,7 +224,19 @@ exports.handler = async (event, context) => {
           body: JSON.stringify({ error: 'Player ID already exists' })
         }
       }
-      throw new Error(result.error || 'Failed to save player')
+      console.error('addPlayer returned success=false:', result.error)
+      await logPlayerAdded(event, context, playerId, false)
+      return {
+        statusCode: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ 
+          error: 'Failed to save player',
+          message: result.error || 'Unknown error saving player data'
+        })
+      }
     }
 
     // Log audit event
