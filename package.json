@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "vite",
     "dev:netlify": "netlify dev",
+    "dev:server": "node server.js",
     "build": "vite build",
+    "start": "node server.js",
     "preview": "vite preview",
     "test": "jest",
     "test:watch": "jest --watch"
@@ -12,6 +14,8 @@
   "dependencies": {
     "@netlify/blobs": "^4.0.0",
     "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "express": "^4.22.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-google-recaptcha": "^3.1.0"
