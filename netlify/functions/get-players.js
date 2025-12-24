@@ -13,7 +13,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const data = await getPlayers()
+    const data = await getPlayers(context)
     
     // Support both old format (array of strings) and new format (array of objects)
     const players = (data.players || []).map(p => 

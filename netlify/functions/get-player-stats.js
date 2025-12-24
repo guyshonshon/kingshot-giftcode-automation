@@ -39,7 +39,7 @@ exports.handler = async (event, context) => {
 
     const playerIds = playersParam.split(',').filter(id => id.trim())
     
-    const data = await getPlayers()
+    const data = await getPlayers(context)
     const playersData = data.players || []
     
     await ensureClaimsFile()

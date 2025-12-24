@@ -334,7 +334,7 @@ exports.handler = async (event, context) => {
 
     // Verify player exists using Netlify Blobs
     const normalizedPlayerId = String(playerId).trim()
-    const exists = await playerExists(normalizedPlayerId)
+    const exists = await playerExists(normalizedPlayerId, context)
     
     if (!exists) {
       return {
@@ -421,7 +421,7 @@ exports.handler = async (event, context) => {
           await addRecentCode(giftCode, playerId)
           
           // Update player metadata using Netlify Blobs
-          const currentData = await getPlayers()
+          const currentData = await getPlayers(context)
           const currentPlayer = currentData.players.find(p => {
             const pId = typeof p === 'string' ? p : p.id
             return String(pId).trim() === normalizedPlayerId
@@ -434,7 +434,7 @@ exports.handler = async (event, context) => {
           await updatePlayer(normalizedPlayerId, {
             lastClaimed: new Date().toISOString(),
             totalClaims: currentTotalClaims + 1
-          })
+          }, context)
           
           codesClaimed.push(giftCode)
           results.push({ giftCode, success: true })

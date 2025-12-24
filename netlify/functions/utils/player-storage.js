@@ -4,8 +4,9 @@ const PLAYERS_STORE_NAME = 'players-data'
 const PLAYERS_KEY = 'players'
 
 // Get players from Netlify Blobs
-async function getPlayers() {
+async function getPlayers(context) {
   try {
+    // Netlify Blobs automatically uses function context when available
     const store = getStore({
       name: PLAYERS_STORE_NAME
     })
@@ -23,8 +24,9 @@ async function getPlayers() {
 }
 
 // Save players to Netlify Blobs
-async function savePlayers(playersData) {
+async function savePlayers(playersData, context) {
   try {
+    // Netlify Blobs automatically uses function context when available
     const store = getStore({
       name: PLAYERS_STORE_NAME
     })
@@ -38,8 +40,8 @@ async function savePlayers(playersData) {
 }
 
 // Add a player
-async function addPlayer(playerData) {
-  const data = await getPlayers()
+async function addPlayer(playerData, context) {
+  const data = await getPlayers(context)
   if (!data.players) {
     data.players = []
   }
@@ -54,14 +56,14 @@ async function addPlayer(playerData) {
   }
   
   data.players.push(playerData)
-  const saved = await savePlayers(data)
+  const saved = await savePlayers(data, context)
   
   return { success: saved, data }
 }
 
 // Remove a player
-async function removePlayer(playerId) {
-  const data = await getPlayers()
+async function removePlayer(playerId, context) {
+  const data = await getPlayers(context)
   if (!data.players) {
     return { success: false, error: 'No players found' }
   }
@@ -82,13 +84,13 @@ async function removePlayer(playerId) {
     return { success: false, error: 'Player not found' }
   }
   
-  const saved = await savePlayers(data)
+  const saved = await savePlayers(data, context)
   return { success: saved, data }
 }
 
 // Update player metadata
-async function updatePlayer(playerId, updates) {
-  const data = await getPlayers()
+async function updatePlayer(playerId, updates, context) {
+  const data = await getPlayers(context)
   if (!data.players) {
     return { success: false, error: 'No players found' }
   }
@@ -121,13 +123,13 @@ async function updatePlayer(playerId, updates) {
     }
   }
   
-  const saved = await savePlayers(data)
+  const saved = await savePlayers(data, context)
   return { success: saved, data, player: data.players[playerIndex] }
 }
 
 // Check if player exists
-async function playerExists(playerId) {
-  const data = await getPlayers()
+async function playerExists(playerId, context) {
+  const data = await getPlayers(context)
   if (!data.players) {
     return false
   }

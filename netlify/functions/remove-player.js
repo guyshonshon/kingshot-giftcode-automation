@@ -100,7 +100,7 @@ exports.handler = async (event, context) => {
     }
 
     // Remove player using Netlify Blobs
-    const result = await removePlayer(playerId)
+    const result = await removePlayer(playerId, context)
     
     if (!result.success) {
       await logPlayerRemoved(event, context, playerId, false)

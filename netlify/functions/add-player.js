@@ -191,7 +191,7 @@ exports.handler = async (event, context) => {
       verificationData: verificationResult.data || null
     }
     
-    const result = await addPlayer(playerData)
+    const result = await addPlayer(playerData, context)
     
     if (!result.success) {
       if (result.error === 'Player already exists') {
