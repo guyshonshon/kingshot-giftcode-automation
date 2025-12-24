@@ -4,7 +4,7 @@ import '../App.css'
 
 const API_BASE = '/.netlify/functions'
 
-function PlayerManagement({ players, activePlayerId, onPlayerAdded, onPlayerRemoved, onDetachPlayer, addActivity, showToast, onCodeClaimed }) {
+function PlayerManagement({ players, activePlayerId, playerData = {}, onPlayerAdded, onPlayerRemoved, onDetachPlayer, addActivity, showToast, onCodeClaimed }) {
   const [playerId, setPlayerId] = useState('')
   const [loading, setLoading] = useState(false)
   const [claimingPlayerId, setClaimingPlayerId] = useState(null)
@@ -14,7 +14,7 @@ function PlayerManagement({ players, activePlayerId, onPlayerAdded, onPlayerRemo
   const claimRecaptchaRefs = useRef({})
   
   // Merge prop playerData with local playerData
-  const mergedPlayerData = { ...localPlayerData, ...playerData }
+  const mergedPlayerData = { ...localPlayerData, ...(playerData || {}) }
 
   const handleAddPlayer = async (e) => {
     e.preventDefault()
