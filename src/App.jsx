@@ -228,12 +228,12 @@ function App() {
         <div className="header-content">
           <h1>Matry's Giftcode Automation</h1>
           <p className="subtitle">This tool claims gifts for you automatically, just add your player id and enjoy :)</p>
-          {activePlayerId && playerData[activePlayerId]?.verificationData && (
+          {activePlayerId && playerData && playerData[activePlayerId]?.verificationData && (
             <div className="active-player-info">
               <span className="active-player-label">Logged in as:</span>
               <span className="active-player-name">
-                {playerData[activePlayerId].verificationData.player_name || 
-                 playerData[activePlayerId].verificationData.name || 
+                {playerData[activePlayerId]?.verificationData?.player_name || 
+                 playerData[activePlayerId]?.verificationData?.name || 
                  activePlayerId}
               </span>
             </div>
