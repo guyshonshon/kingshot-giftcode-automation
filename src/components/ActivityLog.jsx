@@ -182,54 +182,56 @@ function ActivityLog({ activities, players, activePlayerId, showToast, onCodeCla
     }
   }
 
+  const activeCodes = codes.filter(c => !c.isExpired).sort((a, b) => {
+    // Sort by expiration date (earliest first)
+    if (!a.expirationDate && !b.expirationDate) return 0
+    if (!a.expirationDate) return 1
+    if (!b.expirationDate) return -1
+    return new Date(a.expirationDate) - new Date(b.expirationDate)
+  })
+  
+  const expiredCodes = codes.filter(c => c.isExpired)
+
   return (
     <div className="section">
       <h2 className="section-title">Active Codes</h2>
       <div className="codes-grid">
         {loading ? (
           <div className="empty-state">Loading codes...</div>
-        ) : codes.length === 0 ? (
+        ) : activeCodes.length === 0 ? (
           <div className="empty-state">No active codes found</div>
         ) : (
-          <>
-            {/* Active Codes */}
-            {codes.filter(c => !c.isExpired).sort((a, b) => {
-              // Sort by expiration date (earliest first)
-              if (!a.expirationDate && !b.expirationDate) return 0
-              if (!a.expirationDate) return 1
-              if (!b.expirationDate) return -1
-              return new Date(a.expirationDate) - new Date(b.expirationDate)
-            }).map((codeData, index) => (
-              <div key={`active-${index}`} className="code-card">
-                <div className="code-header">
-                  <strong 
-                    className="code-text code-text-clickable" 
-                    onClick={() => handleCopyCode(codeData.code)}
-                    title="Click to copy code"
-                  >
-                    {codeData.code}
-                  </strong>
-                  <div className="code-meta">
-                    {codeData.claimCount} claim{codeData.claimCount !== 1 ? 's' : ''}
-                  </div>
+          activeCodes.map((codeData, index) => (
+            <div key={`active-${index}`} className="code-card">
+              <div className="code-header">
+                <strong 
+                  className="code-text code-text-clickable" 
+                  onClick={() => handleCopyCode(codeData.code)}
+                  title="Click to copy code"
+                >
+                  {codeData.code}
+                </strong>
+                <div className="code-meta">
+                  {codeData.claimCount} claim{codeData.claimCount !== 1 ? 's' : ''}
                 </div>
-                
-                {codeData.players && codeData.players.length > 0 && (
-                  <div className="code-players">
-                    <small>Players: {codeData.players.join(', ')}</small>
-                  </div>
-                )}
+              </div>
+              
+              {codeData.players && codeData.players.length > 0 && (
+                <div className="code-players">
+                  <small>Players: {codeData.players.join(', ')}</small>
+                </div>
+              )}
 
-                {codeData.expiration && (
-                  <div className="code-expiration">
-                    <small>⏰ Expires: {codeData.expiration}</small>
-                  </div>
-                )}
-                {!codeData.expiration && (
-                  <div className="code-expiration" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
-                    <small>No expiration date</small>
-                  </div>
-                )}
+              {codeData.expiration && (
+                <div className="code-expiration">
+                  <small>⏰ Expires: {codeData.expiration}</small>
+                </div>
+              )}
+              {!codeData.expiration && (
+                <div className="code-expiration" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
+                  <small>No expiration date</small>
+                </div>
+              )}
 
               <div className="code-actions">
                 {import.meta.env.VITE_RECAPTCHA_SITE_KEY && 
@@ -261,52 +263,34 @@ function ActivityLog({ activities, players, activePlayerId, showToast, onCodeCla
                   </button>
                 )}
               </div>
-              </div>
-            ))}
-            
-            {/* Separator */}
-            {codes.filter(c => c.isExpired).length > 0 && codes.filter(c => !c.isExpired).length > 0 && (
-              <div className="codes-separator">
-                <hr />
-                <h3 className="expired-section-title">Expired Gift Codes</h3>
-              </div>
-            )}
-            
-            {/* Expired Codes */}
-            {codes.filter(c => c.isExpired).map((codeData, index) => (
-              <div key={`expired-${index}`} className="code-card code-card-expired">
-                <div className="code-header">
-                  <strong className="code-text">{codeData.code}</strong>
-                  <div className="code-meta">
+            </div>
+          ))
+        )}
+      </div>
+      
+      {/* Expired Codes Section - Separate Container */}
+      {expiredCodes.length > 0 && (
+        <div className="expired-codes-section">
+          <h2 className="section-title">Expired Codes</h2>
+          <div className="expired-codes-grid">
+            {expiredCodes.map((codeData, index) => (
+              <div key={`expired-${index}`} className="expired-code-card">
+                <div className="expired-code-header">
+                  <div className="expired-code-name">{codeData.code}</div>
+                  <div className="expired-code-meta">
                     {codeData.claimCount} claim{codeData.claimCount !== 1 ? 's' : ''}
                   </div>
                 </div>
-                
-                {codeData.players && codeData.players.length > 0 && (
-                  <div className="code-players">
-                    <small>Players: {codeData.players.join(', ')}</small>
-                  </div>
-                )}
-
                 {codeData.expiration && (
-                  <div className="code-expiration">
-                    <small>⏰ Expired: {codeData.expiration}</small>
+                  <div className="expired-code-date">
+                    <small>Expired: {codeData.expiration}</small>
                   </div>
                 )}
-                
-                <div className="code-actions">
-                  <button
-                    disabled
-                    className="btn btn-small btn-disabled"
-                  >
-                    Expired
-                  </button>
-                </div>
               </div>
             ))}
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

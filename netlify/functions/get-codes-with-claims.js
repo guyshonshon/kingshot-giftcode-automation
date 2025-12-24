@@ -39,111 +39,132 @@ async function scrapeGiftCodes() {
         try {
           const activeCodes = []
           const expiredCodes = []
+          const foundCodes = new Set()
           
-          // Extract Active Gift Codes section
-          const activeSectionMatch = data.match(/## Active Gift Codes([\s\S]*?)(?:## Expired Gift Codes|$)/i)
-          if (activeSectionMatch) {
-            const activeSection = activeSectionMatch[1]
-            const foundActive = new Set()
+          // The site is a Next.js app with JSON embedded in the HTML
+          // The JSON can be escaped (\"code\":\"THEKINGSTORE\") or unescaped ("code":"THEKINGSTORE")
+          // Look for patterns like: "code":"THEKINGSTORE"...\"isActive\":true...\"expiresAt\":\"$D2026-01-05T00:00:00.000Z\" or null
+          // Use a regex to extract each code object (handling both escaped and unescaped quotes)
+          // Pattern matches: "code":"CODE" or \"code\":\"CODE\"...\"isActive\":true/false...\"expiresAt\":\"DATE\" or \"expiresAt\":null
+          // Try escaped version first, then unescaped
+          const codePatternEscaped = /\\"code\\":\\"([A-Z0-9]{4,20})\\"([\s\S]{0,2000}?)\\"isActive\\":(true|false)([\s\S]{0,2000}?)\\"expiresAt\\":(null|\\"([^"]*)\\")/g
+          const codePatternUnescaped = /"code":"([A-Z0-9]{4,20})"([\s\S]{0,2000}?)"isActive":(true|false)([\s\S]{0,2000}?)"expiresAt":(null|"([^"]*)")/g
+          let match
+          
+          // First try escaped pattern
+          while ((match = codePatternEscaped.exec(data)) !== null) {
+            const code = match[1]
+            if (foundCodes.has(code)) continue // Skip duplicates
+            foundCodes.add(code)
             
-            // Split by "Active" markers to get individual code blocks
-            const activeBlocks = activeSection.split(/Active\s+/i).filter(block => block.trim().length > 0)
+            const isActive = match[3] === 'true'
+            // match[5] is either "null" or the quoted date string
+            // match[6] is the date string inside quotes (if it's a quoted string, undefined if null)
+            let expiresAt = match[5] === 'null' ? null : match[6]
             
-            activeBlocks.forEach(block => {
-              // Extract code - look for standalone code on a line
-              const lines = block.split(/\n/).map(l => l.trim()).filter(l => l.length > 0)
-              
-              let code = null
-              let expiration = null
-              
-              for (let i = 0; i < lines.length; i++) {
-                const line = lines[i]
-                
-                // Check if this line is a code (4-20 alphanumeric chars, standalone)
-                const codeMatch = line.match(/^([A-Z0-9]{4,20})$/i)
-                if (codeMatch && !code) {
-                  const potentialCode = codeMatch[1].toUpperCase().trim()
-                  const excludeList = ['ACTIVE', 'EXPIRED', 'EXPIRES', 'COPY', 'QUICK', 'REDEEM', 'SHARE', 'GIFT', 'CODES']
-                  if (!excludeList.includes(potentialCode) && /^[A-Z0-9]+$/.test(potentialCode)) {
-                    code = potentialCode
-                  }
+            // Handle Next.js date format: $D2026-01-05T00:00:00.000Z
+            if (expiresAt && typeof expiresAt === 'string' && expiresAt.startsWith('$D')) {
+              expiresAt = expiresAt.substring(2) // Remove $D prefix
+            }
+            
+            let expiration = null
+            let isExpired = false
+            
+            if (expiresAt && expiresAt !== 'null') {
+              try {
+                const expDate = new Date(expiresAt)
+                if (!isNaN(expDate.getTime())) {
+                  // Format as MM/DD/YYYY
+                  const month = expDate.getMonth() + 1
+                  const day = expDate.getDate()
+                  const year = expDate.getFullYear()
+                  expiration = `${month}/${day}/${year}`
+                  
+                  // Check if expired - dates from kingshot.net are in UTC
+                  // Compare UTC timestamps directly for accuracy
+                  const now = new Date()
+                  const nowUTC = Date.UTC(
+                    now.getUTCFullYear(),
+                    now.getUTCMonth(),
+                    now.getUTCDate(),
+                    now.getUTCHours(),
+                    now.getUTCMinutes(),
+                    now.getUTCSeconds()
+                  )
+                  isExpired = expDate.getTime() < nowUTC
                 }
-                
-                // Check for expiration date
-                const expirationMatch = line.match(/Expires:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)
-                if (expirationMatch) {
-                  expiration = expirationMatch[1].trim()
-                }
-                
-                // If we found both code and expiration, or code and we're at the end, break
-                if (code && (expiration || i === lines.length - 1)) {
-                  break
-                }
+              } catch (e) {
+                console.error(`Error parsing date for code ${code}:`, e)
               }
-              
-              if (code && !foundActive.has(code)) {
-                foundActive.add(code)
-                activeCodes.push({ code, expiration, isExpired: false })
-              }
-            })
+            }
+            
+            // Determine if code is active based on isActive flag and expiration
+            if (isActive && !isExpired) {
+              activeCodes.push({ code, expiration, isExpired: false })
+            } else {
+              expiredCodes.push({ code, expiration, isExpired: true })
+            }
           }
           
-          // Extract Expired Gift Codes section
-          const expiredSectionMatch = data.match(/## Expired Gift Codes([\s\S]*?)(?:##|$)/i)
-          if (expiredSectionMatch) {
-            const expiredSection = expiredSectionMatch[1]
-            const foundExpired = new Set()
+          // Then try unescaped pattern for codes we haven't found yet
+          while ((match = codePatternUnescaped.exec(data)) !== null) {
+            const code = match[1]
+            if (foundCodes.has(code)) continue // Skip duplicates
+            foundCodes.add(code)
             
-            // Split by "Expired" markers to get individual code blocks
-            const expiredBlocks = expiredSection.split(/Expired\s+/i).filter(block => block.trim().length > 0)
+            const isActive = match[3] === 'true'
+            let expiresAt = match[5] === 'null' ? null : match[6]
             
-            expiredBlocks.forEach(block => {
-              // Skip if this block contains "Expired At" in the first part (it's part of previous block)
-              if (/Expired At:/i.test(block.split(/\n/)[0])) {
-                return
-              }
-              
-              // Extract code - look for standalone code on a line
-              const lines = block.split(/\n/).map(l => l.trim()).filter(l => l.length > 0)
-              
-              let code = null
-              let expiration = null
-              
-              for (let i = 0; i < lines.length; i++) {
-                const line = lines[i]
-                
-                // Check if this line is a code (4-20 alphanumeric chars, standalone)
-                const codeMatch = line.match(/^([A-Z0-9]{4,20})$/i)
-                if (codeMatch && !code) {
-                  const potentialCode = codeMatch[1].toUpperCase().trim()
-                  const excludeList = ['EXPIRED', 'EXPIRES', 'GIFT', 'CODES', 'SPECIFIED', 'YET', 'EXPIRATION', 'AT']
-                  if (!excludeList.includes(potentialCode) && /^[A-Z0-9]+$/.test(potentialCode)) {
-                    code = potentialCode
-                  }
+            // Handle Next.js date format: $D2026-01-05T00:00:00.000Z
+            if (expiresAt && typeof expiresAt === 'string' && expiresAt.startsWith('$D')) {
+              expiresAt = expiresAt.substring(2) // Remove $D prefix
+            }
+            
+            let expiration = null
+            let isExpired = false
+            
+            if (expiresAt && expiresAt !== 'null') {
+              try {
+                const expDate = new Date(expiresAt)
+                if (!isNaN(expDate.getTime())) {
+                  // Format as MM/DD/YYYY
+                  const month = expDate.getMonth() + 1
+                  const day = expDate.getDate()
+                  const year = expDate.getFullYear()
+                  expiration = `${month}/${day}/${year}`
+                  
+                  // Check if expired - dates from kingshot.net are in UTC
+                  // Compare UTC timestamps directly for accuracy
+                  const now = new Date()
+                  const nowUTC = Date.UTC(
+                    now.getUTCFullYear(),
+                    now.getUTCMonth(),
+                    now.getUTCDate(),
+                    now.getUTCHours(),
+                    now.getUTCMinutes(),
+                    now.getUTCSeconds()
+                  )
+                  isExpired = expDate.getTime() < nowUTC
                 }
-                
-                // Check for expiration date
-                const expiredAtMatch = line.match(/Expired At:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)
-                if (expiredAtMatch) {
-                  expiration = expiredAtMatch[1].trim()
-                }
-                
-                // If we found both code and expiration, or code and we're at the end, break
-                if (code && (expiration || i === lines.length - 1)) {
-                  break
-                }
+              } catch (e) {
+                console.error(`Error parsing date for code ${code}:`, e)
               }
-              
-              if (code && !foundExpired.has(code) && !activeCodes.find(ac => ac.code === code)) {
-                foundExpired.add(code)
-                expiredCodes.push({ code, expiration, isExpired: true })
-              }
-            })
+            }
+            
+            // Determine if code is active based on isActive flag and expiration
+            if (isActive && !isExpired) {
+              activeCodes.push({ code, expiration, isExpired: false })
+            } else {
+              expiredCodes.push({ code, expiration, isExpired: true })
+            }
           }
+          
+          console.log(`Scraped ${activeCodes.length} active codes and ${expiredCodes.length} expired codes`)
           
           // Return both active and expired codes
           resolve({ active: activeCodes, expired: expiredCodes })
         } catch (error) {
+          console.error('Error in scrapeGiftCodes:', error)
           reject(error)
         }
       })

@@ -229,6 +229,30 @@ Automatically claims gift codes for all registered players.
 - Data stored in `/tmp/claims.json` (ephemeral - see Data Persistence section)
 - Use `force: true` to bypass tracking and re-claim codes
 
+### Expired Codes Check
+
+The system includes a scheduled function that periodically checks for expired gift codes:
+
+**Endpoint:** `/.netlify/functions/check-expired-codes`
+- Method: POST (or scheduled)
+- Returns: List of active and expired codes with UTC timestamps
+
+**Features:**
+- Scrapes `kingshot.net/gift-codes` to get current code status
+- Uses UTC timezone for accurate expiration checking (matches kingshot.net's date format)
+- Compares UTC timestamps directly for precision
+- Logs all checks to audit logs
+
+**Scheduled Execution:**
+- Configured in `netlify.toml` to run every hour (UTC)
+- Schedule: `0 * * * *` (at minute 0 of every hour)
+- Automatically checks all codes and updates their expiration status
+
+**Date Format:**
+- Kingshot.net uses UTC timezone (Z suffix)
+- Example: `2026-01-05T00:00:00.000Z` or `2025-12-24T23:59:00.000Z`
+- The system compares UTC timestamps for accurate expiration detection
+
 ### Mobile-First Design
 
 The UI has been redesigned with a mobile-first approach:
