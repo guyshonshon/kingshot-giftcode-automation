@@ -5,9 +5,36 @@
 - ✅ **750 hours/month free** (enough for 24/7)
 - ✅ **Automatic deployments** from GitHub
 - ✅ **Free SSL**
-- ✅ **Simple setup**
+- ✅ **CLI support** (like Vercel/Netlify)
 
-## Quick Deploy (5 minutes)
+## Option 1: Deploy via CLI (Recommended - Fastest!)
+
+### Step 1: Install Render CLI
+```bash
+brew install render
+```
+Or download from: https://github.com/render-oss/render-cli/releases
+
+### Step 2: Login
+```bash
+render login
+```
+Opens browser to authenticate.
+
+### Step 3: Initialize & Deploy
+```bash
+render init
+```
+Follow prompts, then:
+```bash
+render deploy
+```
+
+**Done!** Your site will be live automatically.
+
+---
+
+## Option 2: Deploy via Dashboard (Alternative)
 
 ### Step 1: Push to GitHub
 ```bash
